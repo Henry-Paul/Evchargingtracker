@@ -1,0 +1,17 @@
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #EEEEEE;
+  color: #444444;
+  margin: 0;
+  text-align: center;
+}
+
+header { background-color: #0076CE; color: white; padding: 1rem; }
+.primary-btn { background: #0076CE; color: white; border: none; padding: 10px 20px; border-radius: 6px; }
+.primary-btn:hover { background: #7AB800; }
+
+#slots-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); margin: 1rem; }
+.slot { padding: 20px; border-radius: 6px; box-shadow: 2px 2px 5px #ccc; cursor: pointer; }
+.slot.available { background: #C8FACD; color: #2D572C; }
+.slot.occupied { background: #FFCCCC; color: #B71C1C; }
+.hidden { display: none; }
