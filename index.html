@@ -3,19 +3,330 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dell EV Charging Tracker</title>
+<title>Dell EV Charging Station</title>
 <link rel="stylesheet" href="styles/dell-theme.css">
 <style>
-.release-btn { 
-  background: #f44336; color: white; border: none; 
-  padding: 5px 10px; border-radius: 4px; margin-top: 5px;
-  cursor: pointer; font-size: 0.8em;
+/* Enhanced User Interface Styles */
+body { 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  margin: 0;
+  min-height: 100vh;
 }
-.release-btn:hover { background: #d32f2f; }
-.slot small { display: block; margin-top: 5px; color: #666; }
-#form-container { 
-  background: white; padding: 1rem; margin: 1rem; 
-  border-radius: 6px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+
+.header-container {
+  background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%);
+  color: white;
+  padding: 2rem 1rem;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.header-container h1 {
+  margin: 0;
+  font-size: 2.2em;
+  font-weight: 300;
+}
+
+.header-container .subtitle {
+  opacity: 0.9;
+  margin-top: 0.5rem;
+  font-size: 1.1em;
+}
+
+.availability-banner {
+  background: white;
+  margin: 1rem;
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.availability-number {
+  font-size: 3em;
+  font-weight: bold;
+  color: #0076CE;
+  margin: 0.5rem 0;
+}
+
+.availability-text {
+  color: #666;
+  font-size: 1.1em;
+}
+
+.quick-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1rem;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  background: #0076CE;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0,118,206,0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.action-button:hover {
+  background: #005bb5;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,118,206,0.4);
+}
+
+.action-button.success {
+  background: #7AB800;
+}
+
+.action-button.success:hover {
+  background: #6ba600;
+}
+
+.slots-container {
+  margin: 1rem;
+}
+
+.section-title {
+  text-align: center;
+  color: #333;
+  font-size: 1.5em;
+  margin: 2rem 0 1rem 0;
+  font-weight: 300;
+}
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1rem;
+}
+
+.slot-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  border: 3px solid transparent;
+}
+
+.slot-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.slot-card.available {
+  border-color: #7AB800;
+  background: linear-gradient(135deg, #fff 0%, #f8fff8 100%);
+}
+
+.slot-card.available:hover {
+  border-color: #6ba600;
+}
+
+.slot-card.occupied {
+  border-color: #ff6b6b;
+  background: linear-gradient(135deg, #fff 0%, #fff8f8 100%);
+  cursor: default;
+}
+
+.slot-id {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.slot-status {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.slot-status.available {
+  color: #7AB800;
+}
+
+.slot-status.occupied {
+  color: #ff6b6b;
+}
+
+.slot-user-info {
+  font-size: 0.9em;
+  color: #666;
+  margin: 0.5rem 0;
+  line-height: 1.4;
+}
+
+.end-charging-btn {
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  padding: 0.7rem 1.2rem;
+  border-radius: 20px;
+  font-size: 0.9em;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.end-charging-btn:hover {
+  background: #ff5252;
+  transform: scale(1.05);
+}
+
+.booking-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.booking-form {
+  background: white;
+  padding: 2rem;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  min-width: 400px;
+  max-width: 90vw;
+}
+
+.booking-form h3 {
+  color: #0076CE;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.4em;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1em;
+  transition: border-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #0076CE;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.btn-primary {
+  background: #0076CE;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #005bb5;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 25px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+.footer {
+  text-align: center;
+  padding: 2rem;
+  background: white;
+  margin-top: 2rem;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+.admin-link {
+  color: #0076CE;
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 1rem;
+}
+
+.admin-link:hover {
+  color: #005bb5;
+}
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  z-index: 2000;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.notification.success { background: #7AB800; }
+.notification.error { background: #ff6b6b; }
+.notification.info { background: #0076CE; }
+
+.hidden { display: none !important; }
+
+@media (max-width: 768px) {
+  .header-container h1 { font-size: 1.8em; }
+  .availability-number { font-size: 2.5em; }
+  .slots-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .booking-form { min-width: 300px; margin: 1rem; }
 }
 </style>
 </head>
@@ -23,33 +334,57 @@
 <body>
 <script src="scripts/dataManager.js"></script>
 
-<header>
-  <h1>Dell EV Charging Slots</h1>
-  <div id="banner"></div>
+<header class="header-container">
+  <h1>⚡ Dell EV Charging Station</h1>
+  <p class="subtitle">Smart charging slot management for Dell employees</p>
 </header>
 
-<section id="user-panel">
-  <button id="scanBtn" class="primary-btn">🔍 Scan QR Code</button>
-  
-  <div id="form-container" class="hidden">
-    <h3>Book Slot: <span id="selectedSlot"></span></h3>
-    <form id="bookingForm">
-      <label>Email Address</label>
-      <input type="email" id="email" required placeholder="john@dell.com">
-      
-      <label>Phone Number</label>
-      <input type="tel" id="phone" required placeholder="555-0123">
-      
-      <button type="submit" class="primary-btn">📋 Book This Slot</button>
-      <button type="button" onclick="this.closest('.hidden').classList.add('hidden')" class="secondary-btn">Cancel</button>
-    </form>
+<section class="availability-banner">
+  <div class="availability-number" id="availableCount">-</div>
+  <div class="availability-text">Available charging slots</div>
+  <div style="margin-top: 1rem; color: #666;">
+    <span id="totalSlotsText">Loading...</span>
   </div>
 </section>
 
-<section id="slots-grid"></section>
+<section class="quick-actions">
+  <button class="action-button" id="scanBtn">
+    🔍 Find Available Slot
+  </button>
+  <button class="action-button" id="mySlotBtn" style="display: none;">
+    🚗 My Charging Session
+  </button>
+</section>
 
-<footer>
-  <p>Powered by Dell Design System</p>
+<section class="slots-container">
+  <h2 class="section-title">Charging Slots Status</h2>
+  <div class="slots-grid" id="slotsGrid"></div>
+</section>
+
+<!-- Booking Modal -->
+<div class="booking-modal hidden" id="bookingModal">
+  <form class="booking-form" id="bookingForm">
+    <h3>Book Charging Slot: <span id="selectedSlot" style="color: #7AB800;"></span></h3>
+    
+    <div class="form-group">
+      <label class="form-label">📧 Email Address</label>
+      <input type="email" class="form-input" id="email" required placeholder="john.doe@dell.com">
+    </div>
+    
+    <div class="form-group">
+      <label class="form-label">📱 Phone Number</label>
+      <input type="tel" class="form-input" id="phone" required placeholder="(555) 123-4567">
+    </div>
+    
+    <div class="form-buttons">
+      <button type="submit" class="btn-primary">🚗 Book This Slot</button>
+      <button type="button" class="btn-secondary" onclick="closeBookingModal()">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<footer class="footer">
+  <p style="color: #666;">Powered by Dell Design System | Real-time Updates</p>
   <a href="admin.html" class="admin-link">🔧 Admin Dashboard</a>
 </footer>
 
