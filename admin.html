@@ -5,13 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Admin Dashboard</title>
 <link rel="stylesheet" href="styles/dell-theme.css">
-<script defer src="scripts/admin.js"></script>
+<style>
+.admin-header { background: #0076CE; color: white; padding: 1rem; text-align: center; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem; }
+.stat-card { background: white; padding: 1rem; border-radius: 6px; box-shadow: 2px 2px 5px #ccc; }
+.admin-table { width: 100%; margin: 1rem; border-collapse: collapse; }
+.admin-table th, .admin-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.admin-table th { background: #0076CE; color: white; }
+.occupied-row { background-color: #ffebee; }
+.available-row { background-color: #e8f5e8; }
+.action-btn { padding: 5px 10px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; }
+.release-btn { background: #f44336; color: white; }
+.contact-btn { background: #2196F3; color: white; }
+</style>
 </head>
+
 <body>
-<h1>Admin Dashboard - Dell Charging Management</h1>
-<table id="admin-table">
-  <thead><tr><th>Slot ID</th><th>Status</th><th>Occupant</th><th>Contact</th></tr></thead>
-  <tbody></tbody>
-</table>
+<header class="admin-header">
+  <h1>🔧 Dell EV Charging - Admin Dashboard</h1>
+  <p>Real-time slot monitoring and management</p>
+</header>
+
+<section class="stats-grid">
+  <div class="stat-card">
+    <h3>Available Slots</h3>
+    <div id="availableCount" class="stat-number">0</div>
+  </div>
+  <div class="stat-card">
+    <h3>Occupied Slots</h3>
+    <div id="occupiedCount" class="stat-number">0</div>
+  </div>
+  <div class="stat-card">
+    <h3>Total Slots</h3>
+    <div id="totalCount" class="stat-number">10</div>
+  </div>
+  <div class="stat-card">
+    <h3>Utilization Rate</h3>
+    <div id="utilizationRate" class="stat-number">0%</div>
+  </div>
+</section>
+
+<section>
+  <h2>Slot Management</h2>
+  <table class="admin-table" id="adminTable">
+    <thead>
+      <tr>
+        <th>Slot ID</th>
+        <th>Status</th>
+        <th>Occupant Email</th>
+        <th>Phone Number</th>
+        <th>Start Time</th>
+        <th>Duration</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="adminTableBody"></tbody>
+  </table>
+</section>
+
+<script src="scripts/admin.js"></script>
 </body>
 </html>
