@@ -1,4 +1,4 @@
-// scripts/dataManager.js - Shared data management for real-time sync
+// scripts/dataManager.js - Enhanced shared data management
 
 class DataManager {
   constructor() {
@@ -14,24 +14,26 @@ class DataManager {
     // Listen for storage changes across tabs/windows
     window.addEventListener('storage', (e) => {
       if (e.key === this.STORAGE_KEY) {
+        console.log('Storage changed, notifying listeners');
         this.notifyListeners();
       }
+    });
+
+    // Also listen for custom events for same-tab updates
+    window.addEventListener('slotsUpdated', () => {
+      console.log('Custom event fired, notifying listeners');
+      this.notifyListeners();
     });
   }
 
   initializeDefaultData() {
+    console.log('Initializing default data...');
     const defaultSlots = [
       { id: "A1", status: "available" },
-      { id: "A2", status: "occupied", 
-        user: { email: "john@dell.com", phone: "555-0123", 
-               startTime: new Date().toISOString(), 
-               sessionId: this.generateSessionId() }},
+      { id: "A2", status: "available" },
       { id: "A3", status: "available" },
       { id: "A4", status: "available" },
-      { id: "A5", status: "occupied", 
-        user: { email: "sarah@dell.com", phone: "555-0456", 
-               startTime: new Date().toISOString(),
-               sessionId: this.generateSessionId() }},
+      { id: "A5", status: "available" },
       { id: "B1", status: "available" },
       { id: "B2", status: "available" },
       { id: "B3", status: "available" },
@@ -46,25 +48,52 @@ class DataManager {
   }
 
   getSlots() {
-    const data = localStorage.getItem(this.STORAGE_KEY);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(this.STORAGE_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error getting slots:', e);
+      return null;
+    }
   }
 
   saveSlots(slots) {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(slots));
-    this.notifyListeners();
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(slots));
+      console.log('Slots saved:', slots);
+      
+      // Fire custom event for same-tab updates
+      window.dispatchEvent(new CustomEvent('slotsUpdated', { detail: slots }));
+      
+      // Also notify listeners directly
+      setTimeout(() => this.notifyListeners(), 100);
+    } catch (e) {
+      console.error('Error saving slots:', e);
+    }
   }
 
   getCurrentUser() {
-    const data = localStorage.getItem(this.USER_KEY);
-    return data ? JSON.parse(data) : null;
+    try {
+      const data = localStorage.getItem(this.USER_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error getting current user:', e);
+      return null;
+    }
   }
 
   setCurrentUser(user) {
-    localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    try {
+      localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+      console.log('Current user set:', user);
+    } catch (e) {
+      console.error('Error setting current user:', e);
+    }
   }
 
   bookSlot(slotId, userEmail, userPhone) {
+    console.log(`Attempting to book slot ${slotId} for ${userEmail}`);
+    
     const slots = this.getSlots();
     const sessionId = this.generateSessionId();
     
@@ -85,25 +114,34 @@ class DataManager {
       this.setCurrentUser({ email: userEmail, phone: userPhone, sessionId: sessionId });
       
       this.saveSlots(slots);
+      console.log(`Slot ${slotId} booked successfully`);
       return { success: true, sessionId: sessionId };
     }
+    
+    console.log(`Failed to book slot ${slotId}`);
     return { success: false, error: 'Slot not available' };
   }
 
   releaseSlot(slotId, sessionId = null) {
+    console.log(`Attempting to release slot ${slotId}`);
+    
     const slots = this.getSlots();
     const slotIndex = slots.findIndex(s => s.id === slotId);
     
     if (slotIndex !== -1 && slots[slotIndex].status === 'occupied') {
-      // Verify session if provided
+      // Verify session if provided (for user releases)
       if (sessionId && slots[slotIndex].user.sessionId !== sessionId) {
+        console.log(`Session mismatch for slot ${slotId}`);
         return { success: false, error: 'Not authorized to release this slot' };
       }
       
       slots[slotIndex] = { id: slotId, status: 'available' };
       this.saveSlots(slots);
+      console.log(`Slot ${slotId} released successfully`);
       return { success: true };
     }
+    
+    console.log(`Failed to release slot ${slotId}`);
     return { success: false, error: 'Slot not occupied' };
   }
 
@@ -116,12 +154,13 @@ class DataManager {
       return false;
     }
     
-    return slot.user.sessionId === currentUser.sessionId;
+    return slot.user && slot.user.sessionId === currentUser.sessionId;
   }
 
   // Real-time update system
   addListener(callback) {
     this.listeners.push(callback);
+    console.log('Listener added, total listeners:', this.listeners.length);
   }
 
   removeListener(callback) {
@@ -129,14 +168,30 @@ class DataManager {
   }
 
   notifyListeners() {
-    this.listeners.forEach(callback => callback(this.getSlots()));
+    console.log('Notifying', this.listeners.length, 'listeners');
+    this.listeners.forEach(callback => {
+      try {
+        callback(this.getSlots());
+      } catch (e) {
+        console.error('Error in listener callback:', e);
+      }
+    });
   }
 
-  // Trigger manual update (for same-tab updates)
-  triggerUpdate() {
-    this.notifyListeners();
+  // Debug method
+  debugInfo() {
+    return {
+      slots: this.getSlots(),
+      currentUser: this.getCurrentUser(),
+      listeners: this.listeners.length
+    };
   }
 }
 
 // Global instance
-window.dataManager = new DataManager();
+if (!window.dataManager) {
+  console.log('Creating new DataManager instance');
+  window.dataManager = new DataManager();
+} else {
+  console.log('DataManager already exists');
+}
