@@ -1,43 +1,32 @@
-// admin.js - Complete admin dashboard functionality
+// scripts/admin.js - Real-time admin dashboard
 
 class AdminDashboard {
   constructor() {
-    this.slots = [];
-    this.loadData();
-    this.startAutoRefresh();
+    this.dataManager = window.dataManager;
+    
+    this.render();
+    
+    // Listen for real-time updates
+    this.dataManager.addListener(() => {
+      this.render();
+    });
+    
+    // Auto-refresh every 5 seconds
+    setInterval(() => {
+      this.render();
+    }, 5000);
   }
 
-  loadData() {
-    // Load from localStorage (shared with main app)
-    const savedSlots = localStorage.getItem('evSlots');
-    this.slots = savedSlots ? JSON.parse(savedSlots) : this.getDefaultSlots();
-    this.updateDashboard();
-  }
-
-  getDefaultSlots() {
-    return [
-      { id: "A1", status: "available" },
-      { id: "A2", status: "occupied", user: { email: "john@dell.com", phone: "555-0123", startTime: new Date().toISOString() }},
-      { id: "A3", status: "available" },
-      { id: "A4", status: "available" },
-      { id: "A5", status: "occupied", user: { email: "sarah@dell.com", phone: "555-0456", startTime: new Date().toISOString() }},
-      { id: "B1", status: "available" },
-      { id: "B2", status: "available" },
-      { id: "B3", status: "available" },
-      { id: "B4", status: "occupied", user: { email: "mike@dell.com", phone: "555-0789", startTime: new Date().toISOString() }},
-      { id: "B5", status: "available" }
-    ];
-  }
-
-  updateDashboard() {
+  render() {
     this.updateStats();
     this.updateTable();
   }
 
   updateStats() {
-    const available = this.slots.filter(s => s.status === "available").length;
-    const occupied = this.slots.filter(s => s.status === "occupied").length;
-    const total = this.slots.length;
+    const slots = this.dataManager.getSlots();
+    const available = slots.filter(s => s.status === "available").length;
+    const occupied = slots.filter(s => s.status === "occupied").length;
+    const total = slots.length;
     const utilization = Math.round((occupied / total) * 100);
 
     document.getElementById('availableCount').textContent = available;
@@ -47,10 +36,11 @@ class AdminDashboard {
   }
 
   updateTable() {
+    const slots = this.dataManager.getSlots();
     const tbody = document.getElementById('adminTableBody');
     tbody.innerHTML = '';
 
-    this.slots.forEach((slot, index) => {
+    slots.forEach((slot, index) => {
       const row = document.createElement('tr');
       row.className = slot.status === 'occupied' ? 'occupied-row' : 'available-row';
       
@@ -66,10 +56,10 @@ class AdminDashboard {
         <td>${duration}</td>
         <td>
           ${slot.status === 'occupied' ? 
-            `<button class="action-btn release-btn" onclick="admin.releaseSlot(${index})">Release</button>
-             <button class="action-btn contact-btn" onclick="admin.contactUser('${slot.user.email}', '${slot.user.phone}')">Contact</button>` 
+            `<button class="action-btn release-btn" onclick="adminDashboard.releaseSlot('${slot.id}')">Release</button>
+             <button class="action-btn contact-btn" onclick="adminDashboard.contactUser('${slot.user.email}', '${slot.user.phone}')">Contact</button>` 
             : 
-            `<button class="action-btn" onclick="admin.reserveSlot(${index})">Reserve</button>`
+            `<button class="action-btn" onclick="adminDashboard.reserveSlot('${slot.id}')">Reserve</button>`
           }
         </td>
       `;
@@ -86,28 +76,32 @@ class AdminDashboard {
     return Math.floor(diff / 60) + 'h ' + (diff % 60) + 'm';
   }
 
-  releaseSlot(index) {
-    if (confirm(`Release slot ${this.slots[index].id}?`)) {
-      this.slots[index] = { id: this.slots[index].id, status: "available" };
-      this.saveData();
-      this.updateDashboard();
-      this.showNotification(`Slot ${this.slots[index].id} released successfully!`);
+  releaseSlot(slotId) {
+    if (confirm(`Release slot ${slotId}? This will end the charging session.`)) {
+      const result = this.dataManager.releaseSlot(slotId);
+      
+      if (result.success) {
+        this.showNotification(`Slot ${slotId} released successfully!`);
+        this.render();
+      } else {
+        alert(`Release failed: ${result.error}`);
+      }
     }
   }
 
-  reserveSlot(index) {
+  reserveSlot(slotId) {
     const email = prompt('Enter email for reservation:');
     const phone = prompt('Enter phone number:');
     
     if (email && phone) {
-      this.slots[index] = {
-        id: this.slots[index].id,
-        status: "occupied",
-        user: { email, phone, startTime: new Date().toISOString() }
-      };
-      this.saveData();
-      this.updateDashboard();
-      this.showNotification(`Slot ${this.slots[index].id} reserved for ${email}`);
+      const result = this.dataManager.bookSlot(slotId, email, phone);
+      
+      if (result.success) {
+        this.showNotification(`Slot ${slotId} reserved for ${email}`);
+        this.render();
+      } else {
+        alert(`Reservation failed: ${result.error}`);
+      }
     }
   }
 
@@ -130,10 +124,6 @@ Cancel = Call Phone');
     }
   }
 
-  saveData() {
-    localStorage.setItem('evSlots', JSON.stringify(this.slots));
-  }
-
   showNotification(message) {
     const notification = document.createElement('div');
     notification.className = 'notification';
@@ -149,16 +139,9 @@ Cancel = Call Phone');
     
     setTimeout(() => notification.remove(), 3000);
   }
-
-  startAutoRefresh() {
-    setInterval(() => {
-      this.loadData(); // Refresh from localStorage every 5 seconds
-    }, 5000);
-  }
 }
 
 // Initialize admin dashboard
-const admin = new AdminDashboard();
-
-// Export for global access
-window.admin = admin;
+document.addEventListener('DOMContentLoaded', () => {
+  window.adminDashboard = new AdminDashboard();
+});
