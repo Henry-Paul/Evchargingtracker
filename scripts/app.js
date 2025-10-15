@@ -1,64 +1,163 @@
-const slots = [
-  { id: "A1", status: "available" },
-  { id: "A2", status: "occupied", user: { email: "john@company.com", phone: "555-0123" }},
-  { id: "A3", status: "available" },
-  { id: "A4", status: "available" },
-  { id: "A5", status: "occupied", user: { email: "sarah@company.com", phone: "555-0456" }},
-];
+// scripts/app.js - Updated user interface with real-time sync
 
-const banner = document.getElementById("banner");
-const grid = document.getElementById("slots-grid");
-const formContainer = document.getElementById("form-container");
-const form = document.getElementById("bookingForm");
+class UserInterface {
+  constructor() {
+    this.dataManager = window.dataManager;
+    this.selectedSlot = null;
+    
+    this.initializeElements();
+    this.setupEventListeners();
+    this.render();
+    
+    // Listen for real-time updates
+    this.dataManager.addListener(() => {
+      this.render();
+    });
+    
+    // Auto-refresh every 3 seconds
+    setInterval(() => {
+      this.render();
+    }, 3000);
+  }
 
-function updateBanner() {
-  const available = slots.filter(s => s.status === "available").length;
-  banner.innerHTML = `<h2>${available} of ${slots.length} slots available</h2>`;
-}
+  initializeElements() {
+    this.banner = document.getElementById("banner");
+    this.grid = document.getElementById("slots-grid");
+    this.formContainer = document.getElementById("form-container");
+    this.form = document.getElementById("bookingForm");
+    this.scanBtn = document.getElementById("scanBtn");
+    this.slotSelect = document.getElementById("slotSelect");
+  }
 
-function renderSlots() {
-  grid.innerHTML = "";
-  slots.forEach((slot, i) => {
-    const div = document.createElement("div");
-    div.className = `slot ${slot.status}`;
-    div.innerHTML = `
-      <h3>${slot.id}</h3>
-      <p>${slot.status === "available" ? "Available" : "Occupied"}</p>
-    `;
-    div.onclick = () => scanSlot(slot, i);
-    grid.appendChild(div);
-  });
-}
+  setupEventListeners() {
+    this.scanBtn.addEventListener('click', () => this.showSlotSelector());
+    this.form.addEventListener('submit', (e) => this.handleBooking(e));
+  }
 
-function scanSlot(slot, i) {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (slot.status === "available") {
-    formContainer.classList.remove("hidden");
-    form.onsubmit = (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value;
-      const phone = document.getElementById("phone").value;
-      localStorage.setItem("user", JSON.stringify({ email, phone }));
-      slots[i] = { id: slot.id, status: "occupied", user: { email, phone }};
-      formContainer.classList.add("hidden");
-      renderSlots();
-      updateBanner();
-    };
-  } else {
-    if (user && slot.user.email === user.email) {
-      if (confirm(`End charging for ${slot.id}?`)) {
-        slots[i] = { id: slot.id, status: "available" };
-        renderSlots();
-        updateBanner();
+  render() {
+    this.updateBanner();
+    this.renderSlots();
+  }
+
+  updateBanner() {
+    const slots = this.dataManager.getSlots();
+    const available = slots.filter(s => s.status === "available").length;
+    this.banner.innerHTML = `<h2>${available} of ${slots.length} slots available</h2>`;
+  }
+
+  renderSlots() {
+    const slots = this.dataManager.getSlots();
+    this.grid.innerHTML = "";
+    
+    slots.forEach(slot => {
+      const div = document.createElement("div");
+      div.className = `slot ${slot.status}`;
+      
+      // Check if current user can release this slot
+      const canRelease = this.dataManager.canUserReleaseSlot(slot.id);
+      
+      div.innerHTML = `
+        <h3>${slot.id}</h3>
+        <p>${slot.status === "available" ? "Available" : "Occupied"}</p>
+        ${slot.status === "occupied" && slot.user ? 
+          `<small>by ${slot.user.email}</small>` : ''}
+        ${canRelease ? 
+          `<button class="release-btn" onclick="userInterface.releaseMySlot('${slot.id}')">End Charging</button>` : ''}
+      `;
+      
+      if (slot.status === "available") {
+        div.onclick = () => this.selectSlot(slot.id);
       }
+      
+      this.grid.appendChild(div);
+    });
+  }
+
+  showSlotSelector() {
+    const slots = this.dataManager.getSlots();
+    const availableSlots = slots.filter(s => s.status === 'available');
+    
+    if (availableSlots.length === 0) {
+      alert('No slots available at the moment');
+      return;
+    }
+    
+    // Create slot selector
+    let selectorHtml = '<select id="slotSelector"><option value="">Select a slot</option>';
+    availableSlots.forEach(slot => {
+      selectorHtml += `<option value="${slot.id}">${slot.id}</option>`;
+    });
+    selectorHtml += '</select>';
+    
+    const selector = document.createElement('div');
+    selector.innerHTML = `
+      <h3>Select Slot to Book:</h3>
+      ${selectorHtml}
+      <button onclick="this.parentElement.remove()">Cancel</button>
+    `;
+    selector.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: white; padding: 2rem; border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 1000;
+    `;
+    
+    document.body.appendChild(selector);
+    
+    document.getElementById('slotSelector').addEventListener('change', (e) => {
+      if (e.target.value) {
+        this.selectSlot(e.target.value);
+        selector.remove();
+      }
+    });
+  }
+
+  selectSlot(slotId) {
+    this.selectedSlot = slotId;
+    this.formContainer.classList.remove("hidden");
+    document.getElementById('selectedSlot').textContent = slotId;
+  }
+
+  handleBooking(e) {
+    e.preventDefault();
+    
+    if (!this.selectedSlot) {
+      alert('Please select a slot first');
+      return;
+    }
+    
+    const email = document.getElementById("email").value;
+    const phone = document.getElementById("phone").value;
+    
+    const result = this.dataManager.bookSlot(this.selectedSlot, email, phone);
+    
+    if (result.success) {
+      alert(`Slot ${this.selectedSlot} booked successfully!`);
+      this.formContainer.classList.add("hidden");
+      this.form.reset();
+      this.selectedSlot = null;
+      this.render();
     } else {
-      alert(`Slot ${slot.id} is currently occupied by:
-${slot.user.email}
-${slot.user.phone}`);
+      alert(`Booking failed: ${result.error}`);
+    }
+  }
+
+  releaseMySlot(slotId) {
+    const currentUser = this.dataManager.getCurrentUser();
+    
+    if (confirm(`End charging session for slot ${slotId}?`)) {
+      const result = this.dataManager.releaseSlot(slotId, currentUser.sessionId);
+      
+      if (result.success) {
+        alert(`Slot ${slotId} is now available!`);
+        this.render();
+      } else {
+        alert(`Release failed: ${result.error}`);
+      }
     }
   }
 }
 
-updateBanner();
-renderSlots();
-setInterval(() => renderSlots(), 3000);
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  window.userInterface = new UserInterface();
+});
