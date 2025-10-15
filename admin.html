@@ -6,10 +6,12 @@
 <title>Dell EV Admin Dashboard</title>
 <link rel="stylesheet" href="styles/dell-theme.css">
 <style>
+/* Admin-specific styles */
 .admin-header { background: #0076CE; color: white; padding: 1rem; text-align: center; }
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem; }
-.stat-card { background: white; padding: 1rem; border-radius: 6px; box-shadow: 2px 2px 5px #ccc; }
-.admin-table { width: 100%; margin: 1rem; border-collapse: collapse; }
+.stat-card { background: white; padding: 1rem; border-radius: 6px; box-shadow: 2px 2px 5px #ccc; text-align: center; }
+.stat-number { font-size: 2em; font-weight: bold; color: #0076CE; }
+.admin-table { width: 95%; margin: 1rem auto; border-collapse: collapse; }
 .admin-table th, .admin-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 .admin-table th { background: #0076CE; color: white; }
 .occupied-row { background-color: #ffebee; }
@@ -17,13 +19,18 @@
 .action-btn { padding: 5px 10px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; }
 .release-btn { background: #f44336; color: white; }
 .contact-btn { background: #2196F3; color: white; }
+.status-occupied { color: #d32f2f; font-weight: bold; }
+.status-available { color: #388e3c; font-weight: bold; }
 </style>
 </head>
 
 <body>
+<script src="scripts/dataManager.js"></script>
+
 <header class="admin-header">
   <h1>🔧 Dell EV Charging - Admin Dashboard</h1>
   <p>Real-time slot monitoring and management</p>
+  <a href="index.html" style="color: #7AB800;">← Back to User View</a>
 </header>
 
 <section class="stats-grid">
@@ -46,7 +53,7 @@
 </section>
 
 <section>
-  <h2>Slot Management</h2>
+  <h2 style="text-align: center;">Live Slot Management</h2>
   <table class="admin-table" id="adminTable">
     <thead>
       <tr>
