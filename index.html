@@ -5,34 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Charging Tracker</title>
 <link rel="stylesheet" href="styles/dell-theme.css">
-<script defer src="scripts/app.js"></script>
+<style>
+.release-btn { 
+  background: #f44336; color: white; border: none; 
+  padding: 5px 10px; border-radius: 4px; margin-top: 5px;
+  cursor: pointer; font-size: 0.8em;
+}
+.release-btn:hover { background: #d32f2f; }
+.slot small { display: block; margin-top: 5px; color: #666; }
+#form-container { 
+  background: white; padding: 1rem; margin: 1rem; 
+  border-radius: 6px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+}
+</style>
 </head>
 
 <body>
+<script src="scripts/dataManager.js"></script>
+
 <header>
   <h1>Dell EV Charging Slots</h1>
   <div id="banner"></div>
 </header>
 
 <section id="user-panel">
-  <button id="scanBtn" class="primary-btn">Scan QR Code</button>
+  <button id="scanBtn" class="primary-btn">🔍 Scan QR Code</button>
+  
   <div id="form-container" class="hidden">
+    <h3>Book Slot: <span id="selectedSlot"></span></h3>
     <form id="bookingForm">
-      <label>Email</label>
-      <input type="email" id="email" required>
-      <label>Phone</label>
-      <input type="tel" id="phone" required>
-      <button type="submit" class="primary-btn">Book Slot</button>
+      <label>Email Address</label>
+      <input type="email" id="email" required placeholder="john@dell.com">
+      
+      <label>Phone Number</label>
+      <input type="tel" id="phone" required placeholder="555-0123">
+      
+      <button type="submit" class="primary-btn">📋 Book This Slot</button>
+      <button type="button" onclick="this.closest('.hidden').classList.add('hidden')" class="secondary-btn">Cancel</button>
     </form>
   </div>
 </section>
 
 <section id="slots-grid"></section>
 
- <!-- Add this to index.html footer -->
 <footer>
   <p>Powered by Dell Design System</p>
-  <a href="admin.html" id="adminLink" class="admin-only">🔧 Admin Dashboard</a>
+  <a href="admin.html" class="admin-link">🔧 Admin Dashboard</a>
 </footer>
+
+<script src="scripts/app.js"></script>
 </body>
 </html>
