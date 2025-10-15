@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dell EV Charging Tracker</title>
+<link rel="stylesheet" href="styles/dell-theme.css">
+<script defer src="scripts/app.js"></script>
+</head>
+
+<body>
+<header>
+  <h1>Dell EV Charging Slots</h1>
+  <div id="banner"></div>
+</header>
+
+<section id="user-panel">
+  <button id="scanBtn" class="primary-btn">Scan QR Code</button>
+  <div id="form-container" class="hidden">
+    <form id="bookingForm">
+      <label>Email</label>
+      <input type="email" id="email" required>
+      <label>Phone</label>
+      <input type="tel" id="phone" required>
+      <button type="submit" class="primary-btn">Book Slot</button>
+    </form>
+  </div>
+</section>
+
+<section id="slots-grid"></section>
+
+<footer><p>Powered by Dell Design System</p></footer>
+</body>
+</html>
