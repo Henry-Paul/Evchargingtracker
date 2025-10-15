@@ -1,4 +1,4 @@
-// scripts/app.js - Updated user interface with real-time sync
+// scripts/app.js - Enhanced user interface with better UX
 
 class UserInterface {
   constructor() {
@@ -11,153 +11,285 @@ class UserInterface {
     
     // Listen for real-time updates
     this.dataManager.addListener(() => {
+      console.log('User interface received update');
       this.render();
     });
     
-    // Auto-refresh every 3 seconds
+    // Auto-refresh every 5 seconds
     setInterval(() => {
       this.render();
-    }, 3000);
+    }, 5000);
+    
+    console.log('UserInterface initialized');
   }
 
   initializeElements() {
-    this.banner = document.getElementById("banner");
-    this.grid = document.getElementById("slots-grid");
-    this.formContainer = document.getElementById("form-container");
-    this.form = document.getElementById("bookingForm");
+    this.availableCount = document.getElementById("availableCount");
+    this.totalSlotsText = document.getElementById("totalSlotsText");
+    this.slotsGrid = document.getElementById("slotsGrid");
+    this.bookingModal = document.getElementById("bookingModal");
+    this.bookingForm = document.getElementById("bookingForm");
     this.scanBtn = document.getElementById("scanBtn");
-    this.slotSelect = document.getElementById("slotSelect");
+    this.mySlotBtn = document.getElementById("mySlotBtn");
   }
 
   setupEventListeners() {
-    this.scanBtn.addEventListener('click', () => this.showSlotSelector());
-    this.form.addEventListener('submit', (e) => this.handleBooking(e));
+    this.scanBtn.addEventListener('click', () => this.showAvailableSlots());
+    this.mySlotBtn.addEventListener('click', () => this.showMySlot());
+    this.bookingForm.addEventListener('submit', (e) => this.handleBooking(e));
+    
+    // Close modal when clicking outside
+    this.bookingModal.addEventListener('click', (e) => {
+      if (e.target === this.bookingModal) {
+        this.closeBookingModal();
+      }
+    });
   }
 
   render() {
-    this.updateBanner();
+    this.updateAvailabilityBanner();
     this.renderSlots();
+    this.updateMySlotButton();
   }
 
-  updateBanner() {
+  updateAvailabilityBanner() {
     const slots = this.dataManager.getSlots();
+    if (!slots) return;
+    
     const available = slots.filter(s => s.status === "available").length;
-    this.banner.innerHTML = `<h2>${available} of ${slots.length} slots available</h2>`;
+    const total = slots.length;
+    
+    this.availableCount.textContent = available;
+    this.totalSlotsText.textContent = `${available} of ${total} slots available`;
+    
+    // Add color coding
+    if (available === 0) {
+      this.availableCount.style.color = '#ff6b6b';
+    } else if (available <= 3) {
+      this.availableCount.style.color = '#ffa726';
+    } else {
+      this.availableCount.style.color = '#7AB800';
+    }
   }
 
   renderSlots() {
     const slots = this.dataManager.getSlots();
-    this.grid.innerHTML = "";
+    if (!slots) return;
+    
+    this.slotsGrid.innerHTML = "";
     
     slots.forEach(slot => {
-      const div = document.createElement("div");
-      div.className = `slot ${slot.status}`;
-      
-      // Check if current user can release this slot
-      const canRelease = this.dataManager.canUserReleaseSlot(slot.id);
-      
-      div.innerHTML = `
-        <h3>${slot.id}</h3>
-        <p>${slot.status === "available" ? "Available" : "Occupied"}</p>
-        ${slot.status === "occupied" && slot.user ? 
-          `<small>by ${slot.user.email}</small>` : ''}
-        ${canRelease ? 
-          `<button class="release-btn" onclick="userInterface.releaseMySlot('${slot.id}')">End Charging</button>` : ''}
-      `;
-      
-      if (slot.status === "available") {
-        div.onclick = () => this.selectSlot(slot.id);
-      }
-      
-      this.grid.appendChild(div);
+      const slotCard = this.createSlotCard(slot);
+      this.slotsGrid.appendChild(slotCard);
     });
   }
 
-  showSlotSelector() {
+  createSlotCard(slot) {
+    const card = document.createElement("div");
+    card.className = `slot-card ${slot.status}`;
+    
+    const canRelease = this.dataManager.canUserReleaseSlot(slot.id);
+    const isMySlot = canRelease;
+    
+    let cardContent = `
+      <div class="slot-id">${slot.id}</div>
+      <div class="slot-status ${slot.status}">
+        ${slot.status === "available" ? "⚡ Available" : "🚗 Occupied"}
+      </div>
+    `;
+    
+    if (slot.status === "occupied" && slot.user) {
+      if (isMySlot) {
+        cardContent += `
+          <div class="slot-user-info">
+            <strong>Your charging session</strong><br>
+            Since: ${new Date(slot.user.startTime).toLocaleTimeString()}
+          </div>
+          <button class="end-charging-btn" onclick="userInterface.releaseMySlot('${slot.id}')">
+            🔌 End Charging
+          </button>
+        `;
+      } else {
+        const duration = this.calculateDuration(slot.user.startTime);
+        cardContent += `
+          <div class="slot-user-info">
+            In use for ${duration}<br>
+            <small>Contact: ${slot.user.email}</small>
+          </div>
+        `;
+      }
+    } else if (slot.status === "available") {
+      card.style.cursor = 'pointer';
+      card.onclick = () => this.selectSlot(slot.id);
+    }
+    
+    card.innerHTML = cardContent;
+    return card;
+  }
+
+  calculateDuration(startTime) {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diff = Math.floor((now - start) / (1000 * 60)); // minutes
+    
+    if (diff < 60) return `${diff} min`;
+    return `${Math.floor(diff / 60)}h ${diff % 60}m`;
+  }
+
+  showAvailableSlots() {
     const slots = this.dataManager.getSlots();
     const availableSlots = slots.filter(s => s.status === 'available');
     
     if (availableSlots.length === 0) {
-      alert('No slots available at the moment');
+      this.showNotification('No slots available at the moment', 'error');
       return;
     }
     
-    // Create slot selector
-    let selectorHtml = '<select id="slotSelector"><option value="">Select a slot</option>';
-    availableSlots.forEach(slot => {
-      selectorHtml += `<option value="${slot.id}">${slot.id}</option>`;
+    // Highlight available slots
+    document.querySelectorAll('.slot-card.available').forEach(card => {
+      card.style.animation = 'pulse 1s ease-in-out 3';
+      card.style.borderColor = '#7AB800';
+      card.style.borderWidth = '4px';
     });
-    selectorHtml += '</select>';
     
-    const selector = document.createElement('div');
-    selector.innerHTML = `
-      <h3>Select Slot to Book:</h3>
-      ${selectorHtml}
-      <button onclick="this.parentElement.remove()">Cancel</button>
-    `;
-    selector.style.cssText = `
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: white; padding: 2rem; border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 1000;
-    `;
+    this.showNotification(`${availableSlots.length} slots available! Click on any green slot to book.`, 'info');
+  }
+
+  showMySlot() {
+    const currentUser = this.dataManager.getCurrentUser();
+    if (!currentUser) {
+      this.showNotification('No active charging session found', 'error');
+      return;
+    }
     
-    document.body.appendChild(selector);
+    const slots = this.dataManager.getSlots();
+    const mySlot = slots.find(s => 
+      s.status === 'occupied' && 
+      s.user && 
+      s.user.sessionId === currentUser.sessionId
+    );
     
-    document.getElementById('slotSelector').addEventListener('change', (e) => {
-      if (e.target.value) {
-        this.selectSlot(e.target.value);
-        selector.remove();
-      }
-    });
+    if (mySlot) {
+      // Highlight my slot
+      document.querySelectorAll('.slot-card').forEach(card => {
+        if (card.querySelector('.slot-id').textContent === mySlot.id) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.style.animation = 'pulse 1s ease-in-out 3';
+        }
+      });
+      
+      const duration = this.calculateDuration(mySlot.user.startTime);
+      this.showNotification(`Your slot: ${mySlot.id} (${duration})`, 'success');
+    } else {
+      this.showNotification('No active charging session found', 'error');
+    }
   }
 
   selectSlot(slotId) {
     this.selectedSlot = slotId;
-    this.formContainer.classList.remove("hidden");
     document.getElementById('selectedSlot').textContent = slotId;
+    this.bookingModal.classList.remove('hidden');
+    
+    // Focus on first input
+    setTimeout(() => {
+      document.getElementById('email').focus();
+    }, 300);
+  }
+
+  closeBookingModal() {
+    this.bookingModal.classList.add('hidden');
+    this.bookingForm.reset();
+    this.selectedSlot = null;
   }
 
   handleBooking(e) {
     e.preventDefault();
     
     if (!this.selectedSlot) {
-      alert('Please select a slot first');
+      this.showNotification('Please select a slot first', 'error');
       return;
     }
     
-    const email = document.getElementById("email").value;
-    const phone = document.getElementById("phone").value;
+    const email = document.getElementById("email").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    
+    if (!email || !phone) {
+      this.showNotification('Please fill in all fields', 'error');
+      return;
+    }
     
     const result = this.dataManager.bookSlot(this.selectedSlot, email, phone);
     
     if (result.success) {
-      alert(`Slot ${this.selectedSlot} booked successfully!`);
-      this.formContainer.classList.add("hidden");
-      this.form.reset();
-      this.selectedSlot = null;
+      this.showNotification(`Slot ${this.selectedSlot} booked successfully! 🎉`, 'success');
+      this.closeBookingModal();
       this.render();
     } else {
-      alert(`Booking failed: ${result.error}`);
+      this.showNotification(`Booking failed: ${result.error}`, 'error');
     }
   }
 
   releaseMySlot(slotId) {
     const currentUser = this.dataManager.getCurrentUser();
     
-    if (confirm(`End charging session for slot ${slotId}?`)) {
-      const result = this.dataManager.releaseSlot(slotId, currentUser.sessionId);
+    if (confirm(`🔌 End charging session for slot ${slotId}?
+
+This will make the slot available for other users.`)) {
+      const result = this.dataManager.releaseSlot(slotId, currentUser ? currentUser.sessionId : null);
       
       if (result.success) {
-        alert(`Slot ${slotId} is now available!`);
+        this.showNotification(`Charging session ended. Slot ${slotId} is now available! 👍`, 'success');
         this.render();
       } else {
-        alert(`Release failed: ${result.error}`);
+        this.showNotification(`Release failed: ${result.error}`, 'error');
       }
     }
+  }
+
+  updateMySlotButton() {
+    const currentUser = this.dataManager.getCurrentUser();
+    if (currentUser) {
+      const slots = this.dataManager.getSlots();
+      const mySlot = slots.find(s => 
+        s.status === 'occupied' && 
+        s.user && 
+        s.user.sessionId === currentUser.sessionId
+      );
+      
+      if (mySlot) {
+        this.mySlotBtn.style.display = 'block';
+        this.mySlotBtn.innerHTML = `🚗 My Slot: ${mySlot.id}`;
+      } else {
+        this.mySlotBtn.style.display = 'none';
+      }
+    } else {
+      this.mySlotBtn.style.display = 'none';
+    }
+  }
+
+  showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.animation = 'slideIn 0.3s ease reverse';
+      setTimeout(() => notification.remove(), 300);
+    }, 4000);
+  }
+}
+
+// Helper function to close modal (for onclick handlers)
+function closeBookingModal() {
+  if (window.userInterface) {
+    window.userInterface.closeBookingModal();
   }
 }
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM loaded, initializing UserInterface');
   window.userInterface = new UserInterface();
 });
