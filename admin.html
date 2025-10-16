@@ -4,9 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Admin Dashboard</title>
-<link rel="stylesheet" href="styles/dell-theme.css">
 <style>
-/* Enhanced Admin UI matching User Interface */
+/* Enhanced Admin Dashboard - Cross-device compatible */
 body { 
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -47,6 +46,26 @@ body {
   color: #6ba600;
 }
 
+.connection-status {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8em;
+  z-index: 1000;
+}
+
+.connection-status.online {
+  background: #7AB800;
+  color: white;
+}
+
+.connection-status.offline {
+  background: #ff6b6b;
+  color: white;
+}
+
 .stats-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -61,6 +80,12 @@ body {
   text-align: center;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   border-left: 4px solid #0076CE;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
 }
 
 .stat-number {
@@ -108,6 +133,14 @@ body {
 
 .control-button.danger:hover {
   background: #ff5252;
+}
+
+.control-button.success {
+  background: #7AB800;
+}
+
+.control-button.success:hover {
+  background: #6ba600;
 }
 
 .slots-section {
@@ -212,32 +245,45 @@ body {
   transform: scale(1.05);
 }
 
-.reserve-btn {
+.call-btn {
   background: #7AB800;
   color: white;
 }
 
-.reserve-btn:hover {
+.call-btn:hover {
   background: #6ba600;
+  transform: scale(1.05);
+}
+
+.reserve-btn {
+  background: #ffa726;
+  color: white;
+}
+
+.reserve-btn:hover {
+  background: #ff9800;
   transform: scale(1.05);
 }
 
 .notification {
   position: fixed;
   top: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 1rem 1.5rem;
   border-radius: 8px;
   color: white;
   font-weight: 600;
   z-index: 2000;
-  animation: slideInRight 0.3s ease;
+  animation: slideDown 0.3s ease;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  max-width: 90vw;
+  text-align: center;
 }
 
-@keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
 .notification.success { background: #7AB800; }
@@ -256,7 +302,52 @@ body {
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.3; }
+}
+
+.contact-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.contact-form {
+  background: white;
+  padding: 2rem;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  min-width: 400px;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.contact-form h3 {
+  color: #0076CE;
+  margin-bottom: 1.5rem;
+}
+
+.contact-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.contact-actions button {
+  padding: 1rem 1.5rem;
+  border: none;
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  min-width: 120px;
 }
 
 .empty-state {
@@ -289,18 +380,28 @@ body {
     padding: 0.3rem 0.6rem;
     font-size: 0.7em;
   }
+  
+  .contact-form {
+    min-width: 300px;
+  }
+  
+  .contact-actions {
+    flex-direction: column;
+  }
 }
 </style>
 </head>
 
 <body>
-<script src="scripts/dataManager.js"></script>
+<script src="scripts/cloudDataManager.js"></script>
+
+<div class="connection-status" id="connectionStatus">🌐 Connecting...</div>
 
 <header class="header-container">
   <h1>🔧 Dell EV Charging Admin</h1>
   <p class="subtitle">
     <span class="live-indicator"></span>
-    Live slot management and monitoring dashboard
+    Cross-device admin dashboard • Real-time sync
   </p>
   <a href="index.html" class="nav-link">← Back to User Dashboard</a>
 </header>
@@ -328,30 +429,30 @@ body {
 </section>
 
 <section class="admin-controls">
-  <h3 style="margin-top: 0; color: #333;">Quick Actions</h3>
-  <button class="control-button" onclick="adminDashboard.refreshData()">
-    🔄 Force Refresh
+  <h3 style="margin-top: 0; color: #333;">Admin Quick Actions</h3>
+  <button class="control-button" onclick="adminDashboard.forceSync()">
+    🔄 Sync All Devices
   </button>
-  <button class="control-button" onclick="adminDashboard.releaseAllSlots()" style="background: #ff6b6b;">
+  <button class="control-button success" onclick="adminDashboard.exportUsageData()">
+    📊 Export Data
+  </button>
+  <button class="control-button danger" onclick="adminDashboard.releaseAllSlots()">
     🆓 Release All Slots
   </button>
-  <button class="control-button" onclick="adminDashboard.exportData()">
-    📊 Export Usage Data
-  </button>
-  <button class="control-button" onclick="adminDashboard.debugData()">
-    🐛 Debug Info
+  <button class="control-button" onclick="adminDashboard.showDebugInfo()">
+    🐛 System Info
   </button>
 </section>
 
 <section class="slots-section">
-  <h2 class="section-title">Live Slot Management</h2>
+  <h2 class="section-title">Cross-Device Slot Management</h2>
   <div class="admin-table-container">
     <table class="admin-table">
       <thead>
         <tr>
           <th>Slot ID</th>
           <th>Status</th>
-          <th>Occupant</th>
+          <th>User Email</th>
           <th>Phone</th>
           <th>Start Time</th>
           <th>Duration</th>
@@ -362,7 +463,7 @@ body {
         <tr>
           <td colspan="7" class="empty-state">
             <div class="empty-state-icon">⏳</div>
-            <div>Loading slot data...</div>
+            <div>Loading cross-device slot data...</div>
           </td>
         </tr>
       </tbody>
