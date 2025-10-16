@@ -4,9 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Charging Station</title>
-<link rel="stylesheet" href="styles/dell-theme.css">
 <style>
-/* Enhanced User Interface Styles */
+/* Enhanced User Interface - Cross-device compatible */
 body { 
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -34,13 +33,34 @@ body {
   font-size: 1.1em;
 }
 
+.connection-status {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8em;
+  z-index: 1000;
+}
+
+.connection-status.online {
+  background: #7AB800;
+  color: white;
+}
+
+.connection-status.offline {
+  background: #ff6b6b;
+  color: white;
+}
+
 .availability-banner {
   background: white;
   margin: 1rem;
   padding: 1.5rem;
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   text-align: center;
+  position: relative;
 }
 
 .availability-number {
@@ -53,6 +73,22 @@ body {
 .availability-text {
   color: #666;
   font-size: 1.1em;
+}
+
+.refresh-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: #7AB800;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .quick-actions {
@@ -84,12 +120,11 @@ body {
   box-shadow: 0 6px 20px rgba(0,118,206,0.4);
 }
 
-.action-button.success {
-  background: #7AB800;
-}
-
-.action-button.success:hover {
-  background: #6ba600;
+.action-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .slots-container {
@@ -120,6 +155,7 @@ body {
   transition: all 0.3s ease;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   border: 3px solid transparent;
+  position: relative;
 }
 
 .slot-card:hover {
@@ -168,6 +204,12 @@ body {
   color: #666;
   margin: 0.5rem 0;
   line-height: 1.4;
+}
+
+.slot-duration {
+  font-size: 0.8em;
+  color: #888;
+  margin-top: 0.5rem;
 }
 
 .end-charging-btn {
@@ -265,6 +307,12 @@ body {
   transform: translateY(-1px);
 }
 
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn-secondary {
   background: #6c757d;
   color: white;
@@ -288,32 +336,24 @@ body {
   box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
 }
 
-.admin-link {
-  color: #0076CE;
-  text-decoration: none;
-  font-weight: 600;
-  margin-left: 1rem;
-}
-
-.admin-link:hover {
-  color: #005bb5;
-}
-
 .notification {
   position: fixed;
   top: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 1rem 1.5rem;
   border-radius: 8px;
   color: white;
   font-weight: 600;
   z-index: 2000;
-  animation: slideIn 0.3s ease;
+  animation: slideDown 0.3s ease;
+  max-width: 90vw;
+  text-align: center;
 }
 
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
 .notification.success { background: #7AB800; }
@@ -321,6 +361,27 @@ body {
 .notification.info { background: #0076CE; }
 
 .hidden { display: none !important; }
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #0076CE;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 1rem auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
 @media (max-width: 768px) {
   .header-container h1 { font-size: 1.8em; }
@@ -332,18 +393,21 @@ body {
 </head>
 
 <body>
-<script src="scripts/dataManager.js"></script>
+<script src="scripts/cloudDataManager.js"></script>
+
+<div class="connection-status" id="connectionStatus">🌐 Connecting...</div>
 
 <header class="header-container">
   <h1>⚡ Dell EV Charging Station</h1>
-  <p class="subtitle">Smart charging slot management for Dell employees</p>
+  <p class="subtitle">Real-time charging slot management - All devices synchronized</p>
 </header>
 
 <section class="availability-banner">
+  <div class="refresh-indicator"></div>
   <div class="availability-number" id="availableCount">-</div>
   <div class="availability-text">Available charging slots</div>
-  <div style="margin-top: 1rem; color: #666;">
-    <span id="totalSlotsText">Loading...</span>
+  <div style="margin-top: 1rem; color: #666; font-size: 0.9em;" id="totalSlotsText">
+    Syncing across all devices...
   </div>
 </section>
 
@@ -354,11 +418,19 @@ body {
   <button class="action-button" id="mySlotBtn" style="display: none;">
     🚗 My Charging Session
   </button>
+  <button class="action-button" id="refreshBtn">
+    🔄 Refresh Status
+  </button>
 </section>
 
 <section class="slots-container">
-  <h2 class="section-title">Charging Slots Status</h2>
-  <div class="slots-grid" id="slotsGrid"></div>
+  <h2 class="section-title">Live Charging Slots Status</h2>
+  <div class="slots-grid" id="slotsGrid">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Loading charging slots from cloud...</p>
+    </div>
+  </div>
 </section>
 
 <!-- Booking Modal -->
@@ -368,24 +440,36 @@ body {
     
     <div class="form-group">
       <label class="form-label">📧 Email Address</label>
-      <input type="email" class="form-input" id="email" required placeholder="john.doe@dell.com">
+      <input type="email" class="form-input" id="email" required placeholder="john.doe@dell.com" 
+             title="Enter your Dell email address">
     </div>
     
     <div class="form-group">
       <label class="form-label">📱 Phone Number</label>
-      <input type="tel" class="form-input" id="phone" required placeholder="(555) 123-4567">
+      <input type="tel" class="form-input" id="phone" required placeholder="(555) 123-4567"
+             title="Enter your contact phone number">
     </div>
     
     <div class="form-buttons">
-      <button type="submit" class="btn-primary">🚗 Book This Slot</button>
-      <button type="button" class="btn-secondary" onclick="closeBookingModal()">Cancel</button>
+      <button type="submit" class="btn-primary" id="bookingSubmitBtn">
+        🚗 Book This Slot
+      </button>
+      <button type="button" class="btn-secondary" onclick="closeBookingModal()">
+        Cancel
+      </button>
     </div>
+    
+    <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 1rem;">
+      💡 Your booking will be visible on all devices. Scan the QR code again to end charging.
+    </p>
   </form>
 </div>
 
 <footer class="footer">
-  <p style="color: #666;">Powered by Dell Design System | Real-time Updates</p>
-  <a href="admin.html" class="admin-link">🔧 Admin Dashboard</a>
+  <p style="color: #666;">Powered by Dell Design System | Real-time Cloud Sync</p>
+  <p style="font-size: 0.9em; color: #888;">
+    🌐 Multi-device support • 📱 Mobile optimized • ⚡ Instant updates
+  </p>
 </footer>
 
 <script src="scripts/app.js"></script>
