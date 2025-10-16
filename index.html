@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Charging Station</title>
 <style>
-/* Enhanced User Interface - Dell Internal */
+/* Enhanced User Interface - GitHub Pages */
 body { 
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -19,6 +19,7 @@ body {
   padding: 2rem 1rem;
   text-align: center;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .header-container h1 {
@@ -33,10 +34,21 @@ body {
   font-size: 1.1em;
 }
 
+.github-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(255,255,255,0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.8em;
+  backdrop-filter: blur(10px);
+}
+
 .connection-status {
   position: fixed;
   top: 10px;
-  right: 10px;
+  left: 10px;
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-size: 0.8em;
@@ -44,58 +56,50 @@ body {
   transition: all 0.3s ease;
 }
 
-.connection-status.online {
-  background: #7AB800;
-  color: white;
-}
-
-.connection-status.offline {
-  background: #ff6b6b;
-  color: white;
-}
-
-.connection-status.syncing {
-  background: #ffa726;
-  color: white;
-}
+.connection-status.online { background: #7AB800; color: white; }
+.connection-status.offline { background: #ff6b6b; color: white; }
+.connection-status.syncing { background: #ffa726; color: white; }
 
 .availability-banner {
   background: white;
   margin: 1rem;
-  padding: 1.5rem;
+  padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   text-align: center;
   position: relative;
+  border-top: 4px solid #0076CE;
 }
 
 .availability-number {
-  font-size: 3em;
+  font-size: 4em;
   font-weight: bold;
   color: #0076CE;
   margin: 0.5rem 0;
-  transition: color 0.3s ease;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
 }
 
 .availability-text {
   color: #666;
-  font-size: 1.1em;
+  font-size: 1.2em;
+  font-weight: 600;
 }
 
 .sync-indicator {
   position: absolute;
   top: 15px;
   right: 15px;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   background: #7AB800;
   border-radius: 50%;
   animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
 }
 
 .quick-actions {
@@ -107,22 +111,25 @@ body {
 }
 
 .action-button {
-  background: #0076CE;
+  background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%);
   color: white;
   border: none;
   padding: 1rem 2rem;
   border-radius: 25px;
   font-size: 1.1em;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(0,118,206,0.3);
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 180px;
+  justify-content: center;
 }
 
 .action-button:hover {
-  background: #005bb5;
+  background: linear-gradient(135deg, #005bb5 0%, #003d7a 100%);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0,118,206,0.4);
 }
@@ -134,6 +141,14 @@ body {
   box-shadow: none;
 }
 
+.action-button.my-slot {
+  background: linear-gradient(135deg, #7AB800 0%, #6ba600 100%);
+}
+
+.action-button.my-slot:hover {
+  background: linear-gradient(135deg, #6ba600 0%, #5a9500 100%);
+}
+
 .slots-container {
   margin: 1rem;
 }
@@ -141,37 +156,37 @@ body {
 .section-title {
   text-align: center;
   color: #333;
-  font-size: 1.5em;
+  font-size: 1.6em;
   margin: 2rem 0 1rem 0;
   font-weight: 300;
 }
 
 .slots-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
   margin: 1rem;
 }
 
 .slot-card {
   background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: 15px;
+  padding: 2rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
   border: 3px solid transparent;
   position: relative;
-  min-height: 140px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .slot-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
 .slot-card.available {
@@ -181,6 +196,7 @@ body {
 
 .slot-card.available:hover {
   border-color: #6ba600;
+  background: linear-gradient(135deg, #f8fff8 0%, #f0fff0 100%);
 }
 
 .slot-card.occupied {
@@ -189,55 +205,65 @@ body {
   cursor: default;
 }
 
+.slot-card.my-slot {
+  border-color: #ffa726;
+  background: linear-gradient(135deg, #fff 0%, #fff8f0 100%);
+  box-shadow: 0 4px 15px rgba(255,167,38,0.3);
+}
+
 .slot-id {
-  font-size: 1.8em;
+  font-size: 2.2em;
   font-weight: bold;
   color: #333;
   margin-bottom: 0.5rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .slot-status {
-  font-size: 1.1em;
+  font-size: 1.2em;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
-.slot-status.available {
-  color: #7AB800;
-}
-
-.slot-status.occupied {
-  color: #ff6b6b;
-}
+.slot-status.available { color: #7AB800; }
+.slot-status.occupied { color: #ff6b6b; }
 
 .slot-user-info {
-  font-size: 0.9em;
+  font-size: 0.95em;
   color: #666;
-  margin: 0.5rem 0;
-  line-height: 1.4;
+  margin: 0.8rem 0;
+  line-height: 1.5;
 }
 
 .slot-duration {
-  font-size: 0.8em;
+  font-size: 0.85em;
   color: #888;
   margin-top: 0.5rem;
+  font-weight: 500;
 }
 
 .end-charging-btn {
-  background: #ff6b6b;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
   color: white;
   border: none;
-  padding: 0.7rem 1.2rem;
-  border-radius: 20px;
-  font-size: 0.9em;
+  padding: 0.8rem 1.5rem;
+  border-radius: 25px;
+  font-size: 0.95em;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 0.8rem;
+  margin-top: 1rem;
   transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(255,107,107,0.3);
 }
 
 .end-charging-btn:hover {
-  background: #ff5252;
-  transform: scale(1.05);
+  background: linear-gradient(135deg, #ff5252 0%, #f44336 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(255,107,107,0.4);
 }
 
 .booking-modal {
@@ -247,6 +273,7 @@ body {
   width: 100%;
   height: 100%;
   background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(5px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -255,44 +282,48 @@ body {
 
 .booking-form {
   background: white;
-  padding: 2rem;
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  min-width: 400px;
+  padding: 2.5rem;
+  border-radius: 20px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+  min-width: 450px;
   max-width: 90vw;
+  border-top: 4px solid #0076CE;
 }
 
 .booking-form h3 {
   color: #0076CE;
   text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.4em;
+  margin-bottom: 2rem;
+  font-size: 1.5em;
+  font-weight: 300;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.8rem;
 }
 
 .form-label {
   display: block;
   color: #333;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.8rem;
+  font-size: 1.1em;
 }
 
 .form-input {
   width: 100%;
-  padding: 1rem;
-  border: 2px solid #ddd;
-  border-radius: 8px;
+  padding: 1.2rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
   font-size: 1em;
-  transition: border-color 0.3s ease;
+  transition: all 0.3s ease;
   box-sizing: border-box;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #0076CE;
+  box-shadow: 0 0 15px rgba(0,118,206,0.2);
 }
 
 .form-buttons {
@@ -303,40 +334,46 @@ body {
 }
 
 .btn-primary {
-  background: #0076CE;
+  background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%);
   color: white;
   border: none;
-  padding: 1rem 2rem;
+  padding: 1.2rem 2.5rem;
   border-radius: 25px;
-  font-size: 1em;
+  font-size: 1.1em;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0,118,206,0.3);
 }
 
 .btn-primary:hover {
-  background: #005bb5;
+  background: linear-gradient(135deg, #005bb5 0%, #003d7a 100%);
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0,118,206,0.4);
 }
 
 .btn-primary:disabled {
   background: #ccc;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
 .btn-secondary {
   background: #6c757d;
   color: white;
   border: none;
-  padding: 1rem 2rem;
+  padding: 1.2rem 2.5rem;
   border-radius: 25px;
-  font-size: 1em;
+  font-size: 1.1em;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .btn-secondary:hover {
   background: #5a6268;
+  transform: translateY(-1px);
 }
 
 .footer {
@@ -345,21 +382,23 @@ body {
   background: white;
   margin-top: 2rem;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  border-top: 2px solid #f0f0f0;
 }
 
 .notification {
   position: fixed;
-  top: 60px;
+  top: 70px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
+  padding: 1rem 2rem;
+  border-radius: 10px;
   color: white;
   font-weight: 600;
   z-index: 2000;
   animation: slideDown 0.3s ease;
   max-width: 90vw;
   text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 @keyframes slideDown {
@@ -367,25 +406,25 @@ body {
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 
-.notification.success { background: #7AB800; }
-.notification.error { background: #ff6b6b; }
-.notification.info { background: #0076CE; }
-.notification.warning { background: #ffa726; }
+.notification.success { background: linear-gradient(135deg, #7AB800 0%, #6ba600 100%); }
+.notification.error { background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%); }
+.notification.info { background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%); }
+.notification.warning { background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%); }
 
 .hidden { display: none !important; }
 
 .loading {
   text-align: center;
-  padding: 2rem;
+  padding: 3rem;
   color: #666;
 }
 
 .spinner {
-  border: 3px solid #f3f3f3;
-  border-top: 3px solid #0076CE;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #0076CE;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 50px;
+  height: 50px;
   animation: spin 1s linear infinite;
   margin: 1rem auto;
 }
@@ -398,32 +437,37 @@ body {
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .header-container h1 { font-size: 1.8em; }
-  .availability-number { font-size: 2.5em; }
-  .slots-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .booking-form { min-width: 300px; margin: 1rem; padding: 1.5rem; }
+  .github-badge { display: none; }
+  .availability-number { font-size: 3em; }
+  .slots-grid { 
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+    gap: 1rem;
+  }
+  .slot-card { padding: 1.5rem; min-height: 140px; }
+  .booking-form { min-width: 300px; margin: 1rem; padding: 2rem; }
   .quick-actions { flex-direction: column; align-items: center; }
-  .action-button { min-width: 200px; justify-content: center; }
+  .action-button { min-width: 200px; }
+  .form-buttons { flex-direction: column; }
+  .btn-primary, .btn-secondary { width: 100%; }
 }
 </style>
 </head>
 
 <body>
-<!-- Load the new data manager -->
-<script src="scripts/simpleDataManager.js"></script>
-
 <div class="connection-status" id="connectionStatus">🔄 Connecting...</div>
 
 <header class="header-container">
+  <div class="github-badge">🚀 Powered by GitHub</div>
   <h1>⚡ Dell EV Charging Station</h1>
-  <p class="subtitle">Internal charging slot management • Real-time sync across all Dell devices</p>
+  <p class="subtitle">Cross-device charging slot management • Real-time GitHub sync</p>
 </header>
 
 <section class="availability-banner">
   <div class="sync-indicator"></div>
   <div class="availability-number" id="availableCount">-</div>
   <div class="availability-text">Available charging slots</div>
-  <div style="margin-top: 1rem; color: #666; font-size: 0.9em;" id="totalSlotsText">
-    Syncing with Dell servers...
+  <div style="margin-top: 1rem; color: #666; font-size: 0.95em;" id="totalSlotsText">
+    Syncing across all devices via GitHub...
   </div>
 </section>
 
@@ -431,20 +475,20 @@ body {
   <button class="action-button" id="scanBtn">
     🔍 Find Available Slot
   </button>
-  <button class="action-button" id="mySlotBtn" style="display: none;">
+  <button class="action-button my-slot" id="mySlotBtn" style="display: none;">
     🚗 My Charging Session
   </button>
   <button class="action-button" id="refreshBtn">
-    🔄 Refresh Status
+    🔄 Force Refresh
   </button>
 </section>
 
 <section class="slots-container">
-  <h2 class="section-title">Live Charging Slots Status</h2>
+  <h2 class="section-title">⚡ Live Charging Slots Status</h2>
   <div class="slots-grid" id="slotsGrid">
     <div class="loading">
       <div class="spinner"></div>
-      <p>Loading slots from Dell servers...</p>
+      <p>Loading slots from GitHub...</p>
     </div>
   </div>
 </section>
@@ -452,7 +496,7 @@ body {
 <!-- Booking Modal -->
 <div class="booking-modal hidden" id="bookingModal">
   <form class="booking-form" id="bookingForm">
-    <h3>Book Charging Slot: <span id="selectedSlot" style="color: #7AB800;"></span></h3>
+    <h3>🎯 Book Charging Slot: <span id="selectedSlot" style="color: #7AB800;"></span></h3>
     
     <div class="form-group">
       <label class="form-label">📧 Email Address</label>
@@ -475,19 +519,23 @@ body {
       </button>
     </div>
     
-    <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 1rem;">
-      💡 Your booking will sync across all Dell devices instantly
+    <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 1.5rem;">
+      💡 Your booking syncs instantly across all devices via GitHub
     </p>
   </form>
 </div>
 
 <footer class="footer">
-  <p style="color: #666;">Powered by Dell Internal Infrastructure</p>
+  <p style="color: #666; font-weight: 600;">🏢 Dell EV Charging Management System</p>
   <p style="font-size: 0.9em; color: #888;">
-    🏢 Internal network • 📱 Multi-device sync • ⚡ Real-time updates
+    🌐 Cross-device sync • 📱 Mobile optimized • ⚡ Real-time updates
+  </p>
+  <p style="font-size: 0.8em; color: #aaa; margin-top: 1rem;">
+    Powered by GitHub Pages • Data synced via GitHub API
   </p>
 </footer>
 
+<script src="scripts/githubDataManager.js"></script>
 <script src="scripts/app.js"></script>
 </body>
 </html>
