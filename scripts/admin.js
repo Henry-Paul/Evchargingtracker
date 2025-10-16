@@ -412,3 +412,18 @@ window.addEventListener('beforeunload', () => {
     window.adminDashboard.destroy();
   }
 });
+
+// scripts/admin.js - Updated for Dell internal system
+
+class AdminDashboard {
+  constructor() {
+    // Change this line to use the simple data manager
+    this.dataManager = window.simpleDataManager;  // Changed from cloudDataManager
+    
+    // ... rest of your existing admin.js code stays exactly the same
+  }
+  
+  // All other methods stay exactly the same
+}
+
+// Rest of file remains unchanged...
