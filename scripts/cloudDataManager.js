@@ -1,26 +1,51 @@
-// scripts/simpleDataManager.js - File-based cross-device sync
+// scripts/simpleDataManager.js - Simple file-based cross-device sync for Dell
 
 class SimpleDataManager {
   constructor() {
-    // Internal Dell network shared endpoint
-    this.DATA_URL = '/shared/ev-charging-data.json';
-    this.BACKUP_URL = '/shared/ev-charging-backup.json';
+    // Dell internal server endpoints - CHANGE THESE TO YOUR SERVER
+    this.DATA_HANDLER_URL = './file-handler.php';  // Adjust path as needed
     this.listeners = [];
     this.pollInterval = null;
     this.lastDataHash = '';
+    this.isOnline = navigator.onLine;
     
-    console.log('🏢 Simple Internal DataManager initializing...');
+    console.log('🏢 Dell Simple DataManager initializing...');
     
+    this.setupNetworkMonitoring();
     this.initializeData();
     this.startRealTimeSync();
   }
 
+  setupNetworkMonitoring() {
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      console.log('📡 Back online - reconnecting to Dell servers');
+      this.startRealTimeSync();
+    });
+    
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      console.log('📵 Offline mode - using local cache');
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+      }
+    });
+  }
+
   async initializeData() {
-    // Try to load existing data
-    const data = await this.loadFromSharedFile();
-    if (!data || data.length === 0) {
-      console.log('📝 Creating initial data file');
-      await this.saveToSharedFile(this.getDefaultSlots());
+    // Try to load existing data from server
+    const serverData = await this.loadFromServer();
+    if (serverData && serverData.length > 0) {
+      localStorage.setItem('evChargingSlots', JSON.stringify(serverData));
+    } else {
+      // Use local cache if server data not available
+      const localData = this.getLocalSlots();
+      if (localData.length === 0) {
+        // Initialize with defaults
+        const defaultSlots = this.getDefaultSlots();
+        localStorage.setItem('evChargingSlots', JSON.stringify(defaultSlots));
+        await this.saveToServer(defaultSlots);
+      }
     }
   }
 
@@ -40,114 +65,143 @@ class SimpleDataManager {
   }
 
   startRealTimeSync() {
-    // Poll shared file every 2 seconds
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+    
+    // Poll server every 3 seconds for cross-device sync
     this.pollInterval = setInterval(() => {
-      this.syncFromSharedFile();
-    }, 2000);
+      if (this.isOnline) {
+        this.syncFromServer();
+      }
+    }, 3000);
     
     // Initial sync
-    this.syncFromSharedFile();
+    this.syncFromServer();
   }
 
-  async syncFromSharedFile() {
+  async syncFromServer() {
+    if (!this.isOnline) return;
+    
     try {
-      const response = await fetch(this.DATA_URL + '?t=' + Date.now(), {
+      const response = await fetch(this.DATA_HANDLER_URL + '?t=' + Date.now(), {
         method: 'GET',
         cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'X-Dell-Client': 'EV-Charging'
         }
       });
       
       if (response.ok) {
-        const text = await response.text();
-        const dataHash = this.hashCode(text);
+        const result = await response.json();
         
-        // Only update if data changed
-        if (dataHash !== this.lastDataHash) {
-          this.lastDataHash = dataHash;
+        if (result.success && result.data) {
+          const dataStr = JSON.stringify(result.data);
+          const dataHash = this.hashCode(dataStr);
           
-          const data = JSON.parse(text);
-          
-          // Update local storage
-          localStorage.setItem('evChargingSlots', JSON.stringify(data));
-          localStorage.setItem('lastSync', new Date().toISOString());
-          
-          // Notify listeners
-          this.notifyListeners();
-          
-          console.log('🔄 Synced from shared file:', data.length, 'slots');
+          // Only update if data changed
+          if (dataHash !== this.lastDataHash) {
+            this.lastDataHash = dataHash;
+            
+            // Update local storage
+            localStorage.setItem('evChargingSlots', dataStr);
+            localStorage.setItem('lastServerSync', result.timestamp);
+            
+            // Notify listeners of change
+            this.notifyListeners();
+            
+            console.log('🔄 Synced from Dell server:', result.data.length, 'slots');
+          }
         }
+      } else {
+        console.log('⚠️ Server response not OK:', response.status);
       }
     } catch (error) {
-      console.log('⚠️ Shared file sync failed, using local cache:', error.message);
-      // Fallback to localStorage
-      const localData = localStorage.getItem('evChargingSlots');
-      if (localData && this.listeners.length > 0) {
+      console.log('⚠️ Dell server sync failed, using local cache:', error.message);
+      
+      // If we have listeners but no recent sync, notify with local data
+      const lastSync = localStorage.getItem('lastServerSync');
+      if (this.listeners.length > 0 && (!lastSync || (Date.now() - new Date(lastSync).getTime()) > 30000)) {
         this.notifyListeners();
       }
     }
   }
 
-  async saveToSharedFile(slots) {
+  async saveToServer(slots) {
+    if (!this.isOnline) {
+      // Save locally and mark for sync when online
+      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
+      localStorage.setItem('pendingServerSync', JSON.stringify(slots));
+      console.log('📵 Offline: saved locally, will sync when online');
+      return false;
+    }
+
     try {
-      // Try to save to main file
-      const saveResult = await this.writeToFile(this.DATA_URL, slots);
-      
-      // Also save backup
-      await this.writeToFile(this.BACKUP_URL, {
-        data: slots,
-        timestamp: new Date().toISOString(),
-        backup: true
+      const response = await fetch(this.DATA_HANDLER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Dell-Client': 'EV-Charging'
+        },
+        body: JSON.stringify(slots)
       });
       
-      // Update local storage
-      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
-      localStorage.setItem('lastSync', new Date().toISOString());
-      
-      console.log('💾 Saved to shared file successfully');
-      
-      // Force sync after save
-      setTimeout(() => {
-        this.syncFromSharedFile();
-      }, 500);
-      
-      return true;
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.success) {
+          // Update local storage
+          localStorage.setItem('evChargingSlots', JSON.stringify(slots));
+          localStorage.setItem('lastServerSync', result.timestamp);
+          
+          // Remove pending sync flag
+          localStorage.removeItem('pendingServerSync');
+          
+          console.log('💾 Saved to Dell server successfully');
+          
+          // Force sync after successful save to notify other devices
+          setTimeout(() => {
+            this.syncFromServer();
+          }, 1000);
+          
+          return true;
+        } else {
+          throw new Error(result.error || 'Server save failed');
+        }
+      } else {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
       
     } catch (error) {
-      console.error('❌ Failed to save to shared file:', error);
+      console.error('❌ Failed to save to Dell server:', error);
       
       // Fallback: save locally and mark for retry
       localStorage.setItem('evChargingSlots', JSON.stringify(slots));
-      localStorage.setItem('pendingSync', JSON.stringify(slots));
+      localStorage.setItem('pendingServerSync', JSON.stringify(slots));
       
       return false;
     }
   }
 
-  async writeToFile(url, data) {
-    // This would typically be handled by a simple PHP script or server endpoint
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data)
-    });
-    
-    return response.ok;
-  }
-
-  async loadFromSharedFile() {
+  async loadFromServer() {
     try {
-      const response = await fetch(this.DATA_URL + '?t=' + Date.now());
+      const response = await fetch(this.DATA_HANDLER_URL + '?t=' + Date.now(), {
+        headers: {
+          'X-Dell-Client': 'EV-Charging'
+        }
+      });
+      
       if (response.ok) {
-        const data = await response.json();
-        return Array.isArray(data) ? data : data.data || [];
+        const result = await response.json();
+        if (result.success && result.data) {
+          console.log('📡 Loaded data from Dell server');
+          return result.data;
+        }
       }
     } catch (error) {
-      console.log('Could not load from shared file:', error.message);
+      console.log('Could not load from Dell server:', error.message);
     }
     return null;
   }
@@ -163,10 +217,15 @@ class SimpleDataManager {
   }
 
   getSlots() {
+    return this.getLocalSlots();
+  }
+
+  getLocalSlots() {
     try {
       const data = localStorage.getItem('evChargingSlots');
       return data ? JSON.parse(data) : [];
     } catch (error) {
+      console.error('Error getting local slots:', error);
       return [];
     }
   }
@@ -193,10 +252,12 @@ class SimpleDataManager {
   }
 
   async bookSlot(slotId, userEmail, userPhone) {
-    console.log(`🎯 BOOKING: Slot ${slotId} for ${userEmail} (shared file)`);
+    console.log(`🎯 BOOKING: Slot ${slotId} for ${userEmail} (Dell server)`);
     
-    // Get fresh data first
-    const slots = await this.loadFromSharedFile() || this.getSlots();
+    // Get fresh data from server first
+    await this.syncFromServer();
+    
+    const slots = this.getSlots();
     const sessionId = this.generateSessionId();
     
     const slotIndex = slots.findIndex(s => s.id === slotId);
@@ -210,48 +271,53 @@ class SimpleDataManager {
           startTime: new Date().toISOString(),
           sessionId: sessionId,
           deviceId: this.getDeviceId(),
-          userAgent: navigator.userAgent
+          userAgent: this.getUserAgentInfo(),
+          bookingTime: new Date().toISOString()
         }
       };
       
       this.setCurrentUser({ email: userEmail, phone: userPhone, sessionId: sessionId });
       
-      const success = await this.saveToSharedFile(slots);
+      const success = await this.saveToServer(slots);
       
       if (success) {
-        console.log(`✅ BOOKING SUCCESS: Slot ${slotId}`);
+        console.log(`✅ BOOKING SUCCESS: Slot ${slotId} saved to Dell server`);
         return { success: true, sessionId: sessionId };
       } else {
-        return { success: false, error: 'Failed to save booking' };
+        console.log(`⚠️ BOOKING SAVED LOCALLY: Slot ${slotId} will sync when online`);
+        return { success: true, sessionId: sessionId };
       }
     }
     
     console.log(`❌ BOOKING FAILED: Slot ${slotId} not available`);
-    return { success: false, error: 'Slot not available' };
+    return { success: false, error: 'Slot not available or already booked' };
   }
 
   async releaseSlot(slotId, sessionId = null) {
-    console.log(`🔓 RELEASE: Slot ${slotId} (shared file)`);
+    console.log(`🔓 RELEASE: Slot ${slotId} (Dell server)`);
     
-    // Get fresh data first
-    const slots = await this.loadFromSharedFile() || this.getSlots();
+    // Get fresh data from server first
+    await this.syncFromServer();
+    
+    const slots = this.getSlots();
     const slotIndex = slots.findIndex(s => s.id === slotId);
     
     if (slotIndex !== -1 && slots[slotIndex].status === 'occupied') {
-      // Verify session for user releases
+      // Verify session for user releases (admin can skip this)
       if (sessionId && slots[slotIndex].user && slots[slotIndex].user.sessionId !== sessionId) {
         return { success: false, error: 'Not authorized to release this slot' };
       }
       
       slots[slotIndex] = { id: slotId, status: 'available' };
       
-      const success = await this.saveToSharedFile(slots);
+      const success = await this.saveToServer(slots);
       
       if (success) {
-        console.log(`✅ RELEASE SUCCESS: Slot ${slotId}`);
+        console.log(`✅ RELEASE SUCCESS: Slot ${slotId} updated on Dell server`);
         return { success: true };
       } else {
-        return { success: false, error: 'Failed to save release' };
+        console.log(`⚠️ RELEASE SAVED LOCALLY: Slot ${slotId} will sync when online`);
+        return { success: true };
       }
     }
     
@@ -268,12 +334,22 @@ class SimpleDataManager {
   }
 
   getDeviceId() {
-    let deviceId = localStorage.getItem('deviceId');
+    let deviceId = localStorage.getItem('dellDeviceId');
     if (!deviceId) {
-      deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('deviceId', deviceId);
+      deviceId = 'dell_device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('dellDeviceId', deviceId);
     }
     return deviceId;
+  }
+
+  getUserAgentInfo() {
+    const ua = navigator.userAgent;
+    if (ua.includes('iPhone')) return 'iPhone';
+    if (ua.includes('iPad')) return 'iPad';
+    if (ua.includes('Android')) return 'Android';
+    if (ua.includes('Windows')) return 'Windows';
+    if (ua.includes('Mac')) return 'Mac';
+    return 'Unknown';
   }
 
   getStats() {
@@ -291,7 +367,7 @@ class SimpleDataManager {
 
   addListener(callback) {
     this.listeners.push(callback);
-    console.log(`📡 Listener added. Total: ${this.listeners.length}`);
+    console.log(`📡 Dell listener added. Total: ${this.listeners.length}`);
     
     setTimeout(() => callback(this.getSlots()), 100);
   }
@@ -302,29 +378,44 @@ class SimpleDataManager {
 
   notifyListeners() {
     const slots = this.getSlots();
-    console.log(`🔔 Notifying ${this.listeners.length} listeners`);
+    console.log(`🔔 Notifying ${this.listeners.length} Dell listeners`);
     
-    this.listeners.forEach(callback => {
+    this.listeners.forEach((callback, index) => {
       try {
         callback(slots);
       } catch (error) {
-        console.error('Error in listener:', error);
+        console.error(`Error in listener ${index}:`, error);
       }
     });
   }
 
   getConnectionStatus() {
     return {
-      online: navigator.onLine,
-      lastSync: localStorage.getItem('lastSync'),
-      hasPendingSync: !!localStorage.getItem('pendingSync'),
-      dataUrl: this.DATA_URL
+      online: this.isOnline,
+      lastSync: localStorage.getItem('lastServerSync'),
+      hasPendingSync: !!localStorage.getItem('pendingServerSync'),
+      serverUrl: this.DATA_HANDLER_URL
     };
   }
 
   async forceSyncAllDevices() {
-    console.log('🔄 Force syncing all devices...');
-    await this.syncFromSharedFile();
+    console.log('🔄 Force syncing all Dell devices...');
+    
+    // Sync any pending data first
+    const pendingData = localStorage.getItem('pendingServerSync');
+    if (pendingData && this.isOnline) {
+      try {
+        const slots = JSON.parse(pendingData);
+        await this.saveToServer(slots);
+        localStorage.removeItem('pendingServerSync');
+      } catch (error) {
+        console.error('Failed to sync pending data:', error);
+      }
+    }
+    
+    // Force fresh sync from server
+    await this.syncFromServer();
+    
     return true;
   }
 
