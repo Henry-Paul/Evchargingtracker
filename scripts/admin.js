@@ -1,28 +1,28 @@
-// scripts/admin.js - Cross-device admin dashboard
+// scripts/admin.js - Enhanced admin dashboard for GitHub Pages
 
 class AdminDashboard {
   constructor() {
-    this.dataManager = window.cloudDataManager;
+    this.dataManager = window.githubDataManager;
     this.syncInterval = null;
     
-    console.log('🔧 Cross-device AdminDashboard initializing...');
+    console.log('🔧 GitHub AdminDashboard initializing...');
     
     this.render();
     
     // Listen for real-time updates
     this.dataManager.addListener((slots) => {
-      console.log('🔔 Admin received cross-device update:', slots?.length || 0, 'slots');
+      console.log('🔔 Admin received GitHub update:', slots?.length || 0, 'slots');
       this.render();
     });
     
-    // Enhanced sync every 3 seconds for cross-device updates
+    // Enhanced sync every 8 seconds
     this.syncInterval = setInterval(() => {
-      this.dataManager.fetchFromFirebase();
-    }, 3000);
+      this.dataManager.syncFromGitHub();
+    }, 8000);
     
     this.setupConnectionMonitoring();
     
-    console.log('✅ Cross-device AdminDashboard initialized');
+    console.log('✅ GitHub AdminDashboard initialized');
   }
 
   setupConnectionMonitoring() {
@@ -36,6 +36,14 @@ class AdminDashboard {
     window.addEventListener('offline', () => {
       this.updateConnectionStatus();
     });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        this.forceSync();
+      }
+    });
   }
 
   updateConnectionStatus() {
@@ -43,7 +51,7 @@ class AdminDashboard {
     const status = this.dataManager.getConnectionStatus();
     
     if (status.online) {
-      connectionStatus.textContent = '🌐 Online';
+      connectionStatus.textContent = '🐙 GitHub Online';
       connectionStatus.className = 'connection-status online';
     } else {
       connectionStatus.textContent = '📵 Offline';
@@ -60,7 +68,7 @@ class AdminDashboard {
   updateStats() {
     const stats = this.dataManager.getStats();
     
-    console.log('📈 Admin updating cross-device stats:', stats);
+    console.log('📈 Admin updating GitHub stats:', stats);
     
     const elements = {
       availableCount: document.getElementById('availableCount'),
@@ -73,6 +81,12 @@ class AdminDashboard {
       if (element) {
         const value = key === 'utilizationRate' ? `${stats.utilization}%` : stats[key.replace('Count', '')];
         element.textContent = value;
+        
+        // Add animation
+        element.style.animation = 'none';
+        setTimeout(() => {
+          element.style.animation = 'pulse 0.5s ease';
+        }, 10);
         
         // Color coding
         if (key === 'occupiedCount') {
@@ -97,22 +111,22 @@ class AdminDashboard {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" class="empty-state">
-            <div class="empty-state-icon">📡</div>
-            <div>Syncing cross-device data...</div>
+            <div class="empty-state-icon">🐙</div>
+            <div>Syncing GitHub data...</div>
           </td>
         </tr>
       `;
       return;
     }
 
-    console.log('🏗️ Building cross-device table with', slots.length, 'slots');
+    console.log('🏗️ Building GitHub table with', slots.length, 'slots');
 
     slots.forEach((slot) => {
       const row = this.createSlotRow(slot);
       tbody.appendChild(row);
     });
     
-    console.log('✅ Cross-device table updated successfully');
+    console.log('✅ GitHub table updated successfully');
   }
 
   createSlotRow(slot) {
@@ -130,7 +144,7 @@ class AdminDashboard {
 
     row.innerHTML = `
       <td>
-        <strong style="font-size: 1.1em; color: #0076CE;">${slot.id}</strong>
+        <strong style="font-size: 1.2em; color: #0076CE;">${slot.id}</strong>
       </td>
       <td>
         <span class="status-badge status-${slot.status}">
@@ -139,11 +153,14 @@ class AdminDashboard {
       </td>
       <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
         ${userEmail}
+        ${slot.user && slot.user.userAgent ? 
+          `<br><small style="color: #666;">📱 ${slot.user.userAgent}</small>` : ''
+        }
       </td>
       <td>
         ${userPhone}
-        ${slot.user && userPhone !== '-' ? 
-          `<br><small style="color: #666;">${this.getDeviceInfo(slot.user)}</small>` : ''
+        ${slot.user && slot.user.deviceId ? 
+          `<br><small style="color: #666;">🔧 ${slot.user.deviceId.substring(0, 12)}...</small>` : ''
         }
       </td>
       <td style="font-size: 0.9em;">${startTime}</td>
@@ -170,14 +187,6 @@ class AdminDashboard {
     return row;
   }
 
-  getDeviceInfo(user) {
-    if (user.deviceId) {
-      const deviceShort = user.deviceId.substring(0, 8) + '...';
-      return `Device: ${deviceShort}`;
-    }
-    return 'Device info N/A';
-  }
-
   calculateDuration(startTime) {
     const start = new Date(startTime);
     const now = new Date();
@@ -193,15 +202,15 @@ class AdminDashboard {
   async releaseSlot(slotId) {
     if (confirm(`🔓 Release slot ${slotId}?
 
-This will immediately end the charging session and sync across all devices.`)) {
+This will immediately end the charging session and sync across all devices via GitHub.`)) {
       try {
         const result = await this.dataManager.releaseSlot(slotId);
         
         if (result.success) {
-          this.showNotification(`✅ Slot ${slotId} released and synced to all devices!`, 'success');
+          this.showNotification(`✅ Slot ${slotId} released and synced via GitHub!`, 'success');
           this.render();
           
-          // Force cross-device sync
+          // Force sync
           setTimeout(() => {
             this.forceSync();
           }, 1000);
@@ -225,7 +234,7 @@ This will immediately end the charging session and sync across all devices.`)) {
       const result = await this.dataManager.bookSlot(slotId, email, phone);
       
       if (result.success) {
-        this.showNotification(`✅ Slot ${slotId} reserved for ${email} (synced to all devices)`, 'success');
+        this.showNotification(`✅ Slot ${slotId} reserved for ${email} (synced via GitHub)`, 'success');
         this.render();
         this.forceSync();
       } else {
@@ -236,7 +245,6 @@ This will immediately end the charging session and sync across all devices.`)) {
     }
   }
 
-  // Quick Call Function
   callUser(phone) {
     if (!phone || phone === '-') {
       this.showNotification('❌ Phone number not available', 'error');
@@ -251,7 +259,6 @@ This will initiate a phone call.`)) {
     }
   }
 
-  // Quick Email Function
   emailUser(email) {
     if (!email || email === '-') {
       this.showNotification('❌ Email address not available', 'error');
@@ -271,12 +278,13 @@ Dell Facilities Team';
   }
 
   async forceSync() {
-    this.showNotification('🔄 Syncing data across all devices...', 'info');
-    await this.dataManager.fetchFromFirebase();
+    this.showNotification('🔄 Syncing GitHub data across all devices...', 'info');
+    
+    await this.dataManager.forceSyncAllDevices();
     this.render();
     
     setTimeout(() => {
-      this.showNotification('✅ All devices synchronized!', 'success');
+      this.showNotification('✅ All devices synchronized via GitHub!', 'success');
     }, 1000);
   }
 
@@ -291,7 +299,7 @@ Dell Facilities Team';
     
     if (confirm(`⚠️ Release ALL ${occupiedSlots.length} occupied slots?
 
-This will end all charging sessions and sync across all devices.`)) {
+This will end all charging sessions and sync via GitHub.`)) {
       try {
         let released = 0;
         
@@ -300,7 +308,7 @@ This will end all charging sessions and sync across all devices.`)) {
           if (result.success) released++;
         }
         
-        this.showNotification(`✅ Released ${released} of ${occupiedSlots.length} slots (synced to all devices)`, 'success');
+        this.showNotification(`✅ Released ${released} of ${occupiedSlots.length} slots (GitHub synced)`, 'success');
         this.render();
         this.forceSync();
       } catch (error) {
@@ -312,6 +320,7 @@ This will end all charging sessions and sync across all devices.`)) {
   exportUsageData() {
     const slots = this.dataManager.getSlots();
     const stats = this.dataManager.getStats();
+    const status = this.dataManager.getConnectionStatus();
     
     const exportData = {
       timestamp: new Date().toISOString(),
@@ -320,12 +329,13 @@ This will end all charging sessions and sync across all devices.`)) {
       occupiedSlots: slots.filter(s => s.status === 'occupied').map(s => ({
         id: s.id,
         user: s.user,
-        duration: s.user ? this.calculateDuration(s.user.startTime) : null,
-        deviceInfo: s.user ? this.getDeviceInfo(s.user) : null
+        duration: s.user ? this.calculateDuration(s.user.startTime) : null
       })),
       systemInfo: {
-        crossDevice: true,
-        cloudSync: this.dataManager.getConnectionStatus()
+        platform: 'GitHub Pages',
+        repository: status.repository,
+        lastSync: status.lastSync,
+        connectionStatus: status
       }
     };
     
@@ -345,8 +355,9 @@ This will end all charging sessions and sync across all devices.`)) {
       connection: this.dataManager.getConnectionStatus(),
       slots: this.dataManager.getSlots(),
       stats: this.dataManager.getStats(),
-      deviceId: localStorage.getItem('deviceId'),
-      currentUser: this.dataManager.getCurrentUser()
+      currentUser: this.dataManager.getCurrentUser(),
+      platform: 'GitHub Pages',
+      userAgent: navigator.userAgent
     };
     
     console.log('🐛 Debug Information:', debugInfo);
@@ -356,17 +367,17 @@ This will end all charging sessions and sync across all devices.`)) {
     modal.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
+      z-index: 1000; backdrop-filter: blur(5px);
     `;
     
     modal.innerHTML = `
-      <div style="background: white; padding: 2rem; border-radius: 12px; max-width: 80vw; max-height: 80vh; overflow: auto;">
-        <h3 style="color: #0076CE; margin-top: 0;">🐛 System Debug Information</h3>
-        <pre style="background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow: auto; font-size: 0.8em;">${debugStr}</pre>
-        <div style="text-align: center; margin-top: 1rem;">
+      <div style="background: white; padding: 2rem; border-radius: 15px; max-width: 80vw; max-height: 80vh; overflow: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <h3 style="color: #0076CE; margin-top: 0;">🐛 GitHub System Debug Information</h3>
+        <pre style="background: #f8f9fa; padding: 1rem; border-radius: 8px; overflow: auto; font-size: 0.8em; border-left: 4px solid #0076CE;">${debugStr}</pre>
+        <div style="text-align: center; margin-top: 1.5rem;">
           <button onclick="this.closest('div[style*="fixed"]').remove()" 
-                  style="background: #0076CE; color: white; border: none; padding: 1rem 2rem; border-radius: 6px; cursor: pointer;">
-            Close
+                  style="background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%); color: white; border: none; padding: 1rem 2rem; border-radius: 25px; cursor: pointer; font-weight: 600;">
+            Close Debug Info
           </button>
         </div>
       </div>
@@ -402,28 +413,12 @@ This will end all charging sessions and sync across all devices.`)) {
 
 // Initialize admin dashboard
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 Cross-device Admin DOM loaded');
+  console.log('🚀 GitHub Admin DOM loaded');
   window.adminDashboard = new AdminDashboard();
 });
 
-// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   if (window.adminDashboard) {
     window.adminDashboard.destroy();
   }
 });
-
-// scripts/admin.js - Updated for Dell internal system
-
-class AdminDashboard {
-  constructor() {
-    // Change this line to use the simple data manager
-    this.dataManager = window.simpleDataManager;  // Changed from cloudDataManager
-    
-    // ... rest of your existing admin.js code stays exactly the same
-  }
-  
-  // All other methods stay exactly the same
-}
-
-// Rest of file remains unchanged...
