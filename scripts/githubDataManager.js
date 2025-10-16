@@ -3,8 +3,8 @@
 class GitHubDataManager {
   constructor() {
     // GitHub configuration - REPLACE WITH YOUR DETAILS
-    this.GITHUB_USERNAME = 'Henry-Paul';  // Replace with your GitHub username
-    this.GITHUB_REPO = 'dell-ev-charging';   // Replace with your repository name
+    this.GITHUB_USERNAME = 'henry-paul';  // Replace with your GitHub username
+    this.GITHUB_REPO = 'Evchargingtracker';   // Replace with your repository name
     this.DATA_FILE = 'data/slots.json';      // Data file path in repo
     this.GITHUB_TOKEN = null; // We'll use public repo without token for read-only
     
