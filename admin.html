@@ -6,68 +6,368 @@
 <title>Dell EV Admin Dashboard</title>
 <link rel="stylesheet" href="styles/dell-theme.css">
 <style>
-/* Admin-specific styles */
-.admin-header { background: #0076CE; color: white; padding: 1rem; text-align: center; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem; }
-.stat-card { background: white; padding: 1rem; border-radius: 6px; box-shadow: 2px 2px 5px #ccc; text-align: center; }
-.stat-number { font-size: 2em; font-weight: bold; color: #0076CE; }
-.admin-table { width: 95%; margin: 1rem auto; border-collapse: collapse; }
-.admin-table th, .admin-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.admin-table th { background: #0076CE; color: white; }
-.occupied-row { background-color: #ffebee; }
-.available-row { background-color: #e8f5e8; }
-.action-btn { padding: 5px 10px; margin: 2px; border: none; border-radius: 3px; cursor: pointer; }
-.release-btn { background: #f44336; color: white; }
-.contact-btn { background: #2196F3; color: white; }
-.status-occupied { color: #d32f2f; font-weight: bold; }
-.status-available { color: #388e3c; font-weight: bold; }
+/* Enhanced Admin UI matching User Interface */
+body { 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  margin: 0;
+  min-height: 100vh;
+}
+
+.header-container {
+  background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%);
+  color: white;
+  padding: 2rem 1rem;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.header-container h1 {
+  margin: 0;
+  font-size: 2.2em;
+  font-weight: 300;
+}
+
+.header-container .subtitle {
+  opacity: 0.9;
+  margin-top: 0.5rem;
+  font-size: 1.1em;
+}
+
+.nav-link {
+  color: #7AB800;
+  text-decoration: none;
+  font-weight: 600;
+  margin-top: 1rem;
+  display: inline-block;
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #6ba600;
+}
+
+.stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 1rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  border-left: 4px solid #0076CE;
+}
+
+.stat-number {
+  font-size: 2.5em;
+  font-weight: bold;
+  color: #0076CE;
+  margin: 0.5rem 0;
+}
+
+.stat-label {
+  color: #666;
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.admin-controls {
+  background: white;
+  margin: 1rem;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.control-button {
+  background: #0076CE;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 25px;
+  font-size: 1em;
+  cursor: pointer;
+  margin: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.control-button:hover {
+  background: #005bb5;
+  transform: translateY(-1px);
+}
+
+.control-button.danger {
+  background: #ff6b6b;
+}
+
+.control-button.danger:hover {
+  background: #ff5252;
+}
+
+.slots-section {
+  margin: 1rem;
+}
+
+.section-title {
+  text-align: center;
+  color: #333;
+  font-size: 1.5em;
+  margin: 2rem 0 1rem 0;
+  font-weight: 300;
+}
+
+.admin-table-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.admin-table th {
+  background: linear-gradient(135deg, #0076CE 0%, #005bb5 100%);
+  color: white;
+  padding: 1rem 0.8rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.admin-table td {
+  padding: 1rem 0.8rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.admin-table tr:hover {
+  background: #f8f9fa;
+}
+
+.occupied-row {
+  background: linear-gradient(135deg, #fff 0%, #fff5f5 100%);
+  border-left: 4px solid #ff6b6b;
+}
+
+.available-row {
+  background: linear-gradient(135deg, #fff 0%, #f8fff8 100%);
+  border-left: 4px solid #7AB800;
+}
+
+.status-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-available {
+  background: #e8f5e8;
+  color: #7AB800;
+}
+
+.status-occupied {
+  background: #ffebee;
+  color: #ff6b6b;
+}
+
+.action-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  font-size: 0.8em;
+  font-weight: 600;
+  margin: 0.2rem;
+  transition: all 0.2s ease;
+}
+
+.release-btn {
+  background: #ff6b6b;
+  color: white;
+}
+
+.release-btn:hover {
+  background: #ff5252;
+  transform: scale(1.05);
+}
+
+.contact-btn {
+  background: #0076CE;
+  color: white;
+}
+
+.contact-btn:hover {
+  background: #005bb5;
+  transform: scale(1.05);
+}
+
+.reserve-btn {
+  background: #7AB800;
+  color: white;
+}
+
+.reserve-btn:hover {
+  background: #6ba600;
+  transform: scale(1.05);
+}
+
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  z-index: 2000;
+  animation: slideInRight 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.notification.success { background: #7AB800; }
+.notification.error { background: #ff6b6b; }
+.notification.info { background: #0076CE; }
+
+.live-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #7AB800;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.empty-state-icon {
+  font-size: 3em;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .stats-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .admin-table {
+    font-size: 0.8em;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    padding: 0.5rem;
+  }
+  
+  .action-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7em;
+  }
+}
 </style>
 </head>
 
 <body>
 <script src="scripts/dataManager.js"></script>
 
-<header class="admin-header">
-  <h1>🔧 Dell EV Charging - Admin Dashboard</h1>
-  <p>Real-time slot monitoring and management</p>
-  <a href="index.html" style="color: #7AB800;">← Back to User View</a>
+<header class="header-container">
+  <h1>🔧 Dell EV Charging Admin</h1>
+  <p class="subtitle">
+    <span class="live-indicator"></span>
+    Live slot management and monitoring dashboard
+  </p>
+  <a href="index.html" class="nav-link">← Back to User Dashboard</a>
 </header>
 
-<section class="stats-grid">
+<section class="stats-container">
   <div class="stat-card">
-    <h3>Available Slots</h3>
-    <div id="availableCount" class="stat-number">0</div>
+    <div class="stat-number" id="availableCount">-</div>
+    <div class="stat-label">Available Slots</div>
   </div>
+  
   <div class="stat-card">
-    <h3>Occupied Slots</h3>
-    <div id="occupiedCount" class="stat-number">0</div>
+    <div class="stat-number" id="occupiedCount">-</div>
+    <div class="stat-label">Occupied Slots</div>
   </div>
+  
   <div class="stat-card">
-    <h3>Total Slots</h3>
-    <div id="totalCount" class="stat-number">10</div>
+    <div class="stat-number" id="totalCount">-</div>
+    <div class="stat-label">Total Slots</div>
   </div>
+  
   <div class="stat-card">
-    <h3>Utilization Rate</h3>
-    <div id="utilizationRate" class="stat-number">0%</div>
+    <div class="stat-number" id="utilizationRate">-</div>
+    <div class="stat-label">Utilization Rate</div>
   </div>
 </section>
 
-<section>
-  <h2 style="text-align: center;">Live Slot Management</h2>
-  <table class="admin-table" id="adminTable">
-    <thead>
-      <tr>
-        <th>Slot ID</th>
-        <th>Status</th>
-        <th>Occupant Email</th>
-        <th>Phone Number</th>
-        <th>Start Time</th>
-        <th>Duration</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody id="adminTableBody"></tbody>
-  </table>
+<section class="admin-controls">
+  <h3 style="margin-top: 0; color: #333;">Quick Actions</h3>
+  <button class="control-button" onclick="adminDashboard.refreshData()">
+    🔄 Force Refresh
+  </button>
+  <button class="control-button" onclick="adminDashboard.releaseAllSlots()" style="background: #ff6b6b;">
+    🆓 Release All Slots
+  </button>
+  <button class="control-button" onclick="adminDashboard.exportData()">
+    📊 Export Usage Data
+  </button>
+  <button class="control-button" onclick="adminDashboard.debugData()">
+    🐛 Debug Info
+  </button>
+</section>
+
+<section class="slots-section">
+  <h2 class="section-title">Live Slot Management</h2>
+  <div class="admin-table-container">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Slot ID</th>
+          <th>Status</th>
+          <th>Occupant</th>
+          <th>Phone</th>
+          <th>Start Time</th>
+          <th>Duration</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="adminTableBody">
+        <tr>
+          <td colspan="7" class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <div>Loading slot data...</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <script src="scripts/admin.js"></script>
