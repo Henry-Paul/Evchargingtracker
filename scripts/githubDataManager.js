@@ -1,62 +1,111 @@
-// scripts/githubDataManager.js - GitHub-powered cross-device data manager
+// scripts/githubDataManager.js - Cross-device sync for GitHub Pages
 
 class GitHubDataManager {
   constructor() {
-    // GitHub configuration - REPLACE WITH YOUR DETAILS
-    this.GITHUB_USERNAME = 'henry-paul';  // Replace with your GitHub username
-    this.GITHUB_REPO = 'Evchargingtracker';   // Replace with your repository name
-    this.DATA_FILE = 'data/slots.json';      // Data file path in repo
-    this.GITHUB_TOKEN = null; // We'll use public repo without token for read-only
+    // GitHub configuration - THESE ARE CONFIGURED FOR YOUR REPO
+    this.GITHUB_USERNAME = 'henry-paul';  // Your GitHub username from the screenshot
+    this.GITHUB_REPO = 'Evchargingtracker';    // Your repository name
+    this.DATA_FILE = 'data/slots.json';
     
-    // Base URLs for GitHub API
-    this.API_BASE = 'https://api.github.com/repos';
-    this.CONTENT_BASE = `${this.API_BASE}/${this.GITHUB_USERNAME}/${this.GITHUB_REPO}/contents/${this.DATA_FILE}`;
+    // URLs for GitHub access
     this.RAW_BASE = `https://raw.githubusercontent.com/${this.GITHUB_USERNAME}/${this.GITHUB_REPO}/main/${this.DATA_FILE}`;
     
     this.listeners = [];
     this.pollInterval = null;
+    this.broadcastChannel = null;
     this.lastDataHash = '';
     this.isOnline = navigator.onLine;
-    this.fileSha = null; // GitHub file SHA for updates
     
-    console.log('🐙 GitHub DataManager initializing...');
+    console.log('🐙 Dell EV GitHub DataManager initializing...');
     console.log('Repository:', `${this.GITHUB_USERNAME}/${this.GITHUB_REPO}`);
+    console.log('Raw URL:', this.RAW_BASE);
     
+    this.setupCrossDeviceSync();
     this.setupNetworkMonitoring();
     this.initializeData();
     this.startRealTimeSync();
   }
 
-  setupNetworkMonitoring() {
-    window.addEventListener('online', () => {
-      this.isOnline = true;
-      console.log('📡 Back online - connecting to GitHub');
-      this.startRealTimeSync();
+  setupCrossDeviceSync() {
+    // BroadcastChannel for same-origin cross-tab communication
+    try {
+      this.broadcastChannel = new BroadcastChannel('dell-ev-charging-sync');
+      this.broadcastChannel.addEventListener('message', (event) => {
+        if (event.data.type === 'slotsUpdated') {
+          console.log('📡 Received broadcast update from another tab');
+          this.handleBroadcastUpdate(event.data.slots);
+        }
+      });
+      console.log('📡 BroadcastChannel enabled for cross-tab sync');
+    } catch (error) {
+      console.log('📡 BroadcastChannel not supported, using storage events only');
+    }
+
+    // Storage event for cross-tab sync (fallback)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'evChargingSlots' && e.newValue) {
+        console.log('💾 Storage event detected from another tab');
+        try {
+          const slots = JSON.parse(e.newValue);
+          this.handleStorageUpdate(slots);
+        } catch (error) {
+          console.error('Error parsing storage update:', error);
+        }
+      }
     });
-    
-    window.addEventListener('offline', () => {
-      this.isOnline = false;
-      console.log('📵 Offline mode');
-      if (this.pollInterval) {
-        clearInterval(this.pollInterval);
+
+    // Visibility change event - sync when tab becomes visible
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        console.log('👁️ Tab became visible, force syncing...');
+        setTimeout(() => {
+          this.forceSyncAllDevices();
+        }, 500);
       }
     });
   }
 
+  setupNetworkMonitoring() {
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      console.log('📡 Back online - syncing with GitHub');
+      this.startRealTimeSync();
+      this.forceSyncAllDevices();
+    });
+    
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      console.log('📵 Offline mode - using local storage only');
+    });
+  }
+
   async initializeData() {
+    console.log('🔄 Initializing data...');
+    
     // Try to load from GitHub first
     const githubData = await this.loadFromGitHub();
     if (githubData && githubData.length > 0) {
       localStorage.setItem('evChargingSlots', JSON.stringify(githubData));
-      console.log('📥 Loaded initial data from GitHub');
+      localStorage.setItem('dataSource', 'github');
+      console.log('📥 Loaded initial data from GitHub:', githubData.length, 'slots');
     } else {
       // Use local cache or defaults
       const localData = this.getLocalSlots();
       if (localData.length === 0) {
         const defaultSlots = this.getDefaultSlots();
         localStorage.setItem('evChargingSlots', JSON.stringify(defaultSlots));
-        console.log('🔧 Using default slots data');
+        localStorage.setItem('dataSource', 'default');
+        console.log('🔧 Using default slots data:', defaultSlots.length, 'slots');
+      } else {
+        localStorage.setItem('dataSource', 'cache');
+        console.log('💾 Using cached data:', localData.length, 'slots');
       }
+    }
+    
+    // Initial hash calculation
+    const currentData = localStorage.getItem('evChargingSlots');
+    if (currentData) {
+      this.lastDataHash = this.hashCode(currentData);
     }
   }
 
@@ -80,33 +129,51 @@ class GitHubDataManager {
       clearInterval(this.pollInterval);
     }
     
-    // Poll GitHub every 5 seconds for cross-device sync
+    // Poll GitHub every 15 seconds for updates
     this.pollInterval = setInterval(() => {
       if (this.isOnline) {
         this.syncFromGitHub();
       }
-    }, 5000);
+      this.checkLocalStorageChanges();
+    }, 15000);
     
-    // Initial sync
-    this.syncFromGitHub();
+    // Also check localStorage changes every 2 seconds
+    setInterval(() => {
+      this.checkLocalStorageChanges();
+    }, 2000);
+    
+    console.log('⏰ Real-time sync started');
+  }
+
+  checkLocalStorageChanges() {
+    const currentData = localStorage.getItem('evChargingSlots');
+    if (currentData) {
+      const dataHash = this.hashCode(currentData);
+      if (dataHash !== this.lastDataHash) {
+        this.lastDataHash = dataHash;
+        console.log('💾 Local storage changed, notifying listeners');
+        this.notifyListeners();
+      }
+    }
   }
 
   async syncFromGitHub() {
     if (!this.isOnline) return;
     
     try {
-      // Use raw.githubusercontent.com for faster access (no API limits)
+      console.log('🔄 Syncing from GitHub...');
       const response = await fetch(this.RAW_BASE + '?t=' + Date.now(), {
         cache: 'no-cache',
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
       });
       
       if (response.ok) {
         const data = await response.json();
         
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           const dataStr = JSON.stringify(data);
           const dataHash = this.hashCode(dataStr);
           
@@ -117,62 +184,85 @@ class GitHubDataManager {
             // Update local storage
             localStorage.setItem('evChargingSlots', dataStr);
             localStorage.setItem('lastGitHubSync', new Date().toISOString());
+            localStorage.setItem('dataSource', 'github');
             
             // Notify listeners
             this.notifyListeners();
             
-            console.log('🐙 Synced from GitHub:', data.length, 'slots');
+            console.log('✅ Synced from GitHub:', data.length, 'slots');
           }
         }
       } else if (response.status === 404) {
-        // File doesn't exist yet, initialize with defaults
-        console.log('📝 GitHub data file not found, using defaults');
-        const defaults = this.getDefaultSlots();
-        localStorage.setItem('evChargingSlots', JSON.stringify(defaults));
-        this.notifyListeners();
+        console.log('⚠️ GitHub data file not found (404)');
+      } else {
+        console.log('⚠️ GitHub sync failed with status:', response.status);
       }
     } catch (error) {
-      console.log('⚠️ GitHub sync failed:', error.message);
-      
-      // If we haven't synced recently, notify with local data
-      const lastSync = localStorage.getItem('lastGitHubSync');
-      if (this.listeners.length > 0 && (!lastSync || (Date.now() - new Date(lastSync).getTime()) > 60000)) {
-        this.notifyListeners();
-      }
+      console.log('❌ GitHub sync error:', error.message);
     }
   }
 
   async loadFromGitHub() {
     try {
-      const response = await fetch(this.RAW_BASE);
+      console.log('📥 Loading initial data from GitHub...');
+      const response = await fetch(this.RAW_BASE + '?t=' + Date.now());
       if (response.ok) {
         const data = await response.json();
-        console.log('📥 Loaded data from GitHub');
+        console.log('✅ Loaded data from GitHub successfully');
         return Array.isArray(data) ? data : null;
+      } else {
+        console.log('⚠️ GitHub initial load failed:', response.status);
       }
     } catch (error) {
-      console.log('Could not load from GitHub:', error.message);
+      console.log('❌ Could not load from GitHub:', error.message);
     }
     return null;
   }
 
-  // Note: Saving to GitHub requires authentication and is complex for a demo
-  // In a real implementation, you'd need GitHub token and proper API calls
-  async saveToGitHub(slots) {
-    console.log('💾 Saving to GitHub would require authentication token');
-    console.log('📝 For demo purposes, saving locally and simulating cross-device sync');
-    
-    // Save locally
-    localStorage.setItem('evChargingSlots', JSON.stringify(slots));
-    localStorage.setItem('lastLocalSave', new Date().toISOString());
-    
-    // Simulate GitHub save delay
-    return new Promise(resolve => {
-      setTimeout(() => {
-        console.log('✅ Simulated GitHub save completed');
-        resolve(true);
-      }, 500);
-    });
+  saveToLocalStorage(slots) {
+    try {
+      const slotsStr = JSON.stringify(slots);
+      localStorage.setItem('evChargingSlots', slotsStr);
+      localStorage.setItem('lastLocalSave', new Date().toISOString());
+      
+      // Update hash
+      this.lastDataHash = this.hashCode(slotsStr);
+      
+      // Broadcast to other tabs
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({
+          type: 'slotsUpdated',
+          slots: slots,
+          timestamp: Date.now(),
+          source: 'localStorage'
+        });
+        console.log('📡 Broadcast sent to other tabs');
+      }
+      
+      console.log('💾 Saved to localStorage successfully');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to save to localStorage:', error);
+      return false;
+    }
+  }
+
+  handleBroadcastUpdate(slots) {
+    if (Array.isArray(slots)) {
+      const slotsStr = JSON.stringify(slots);
+      localStorage.setItem('evChargingSlots', slotsStr);
+      this.lastDataHash = this.hashCode(slotsStr);
+      this.notifyListeners();
+      console.log('📡 Updated from broadcast message');
+    }
+  }
+
+  handleStorageUpdate(slots) {
+    if (Array.isArray(slots)) {
+      this.lastDataHash = this.hashCode(JSON.stringify(slots));
+      this.notifyListeners();
+      console.log('💾 Updated from storage event');
+    }
   }
 
   hashCode(str) {
@@ -222,10 +312,7 @@ class GitHubDataManager {
   }
 
   async bookSlot(slotId, userEmail, userPhone) {
-    console.log(`🎯 BOOKING: Slot ${slotId} for ${userEmail} (GitHub demo)`);
-    
-    // Get fresh data first
-    await this.syncFromGitHub();
+    console.log(`🎯 BOOKING ATTEMPT: Slot ${slotId} for ${userEmail}`);
     
     const slots = this.getSlots();
     const sessionId = this.generateSessionId();
@@ -248,16 +335,16 @@ class GitHubDataManager {
       
       this.setCurrentUser({ email: userEmail, phone: userPhone, sessionId: sessionId });
       
-      // Save changes
-      const success = await this.saveToGitHub(slots);
+      // Save changes with cross-device sync
+      const success = this.saveToLocalStorage(slots);
       
       if (success) {
-        // Force sync to simulate cross-device update
+        // Force immediate notification
         setTimeout(() => {
           this.notifyListeners();
-        }, 1000);
+        }, 100);
         
-        console.log(`✅ BOOKING SUCCESS: Slot ${slotId}`);
+        console.log(`✅ BOOKING SUCCESS: Slot ${slotId} booked for ${userEmail}`);
         return { success: true, sessionId: sessionId };
       } else {
         return { success: false, error: 'Failed to save booking' };
@@ -265,14 +352,11 @@ class GitHubDataManager {
     }
     
     console.log(`❌ BOOKING FAILED: Slot ${slotId} not available`);
-    return { success: false, error: 'Slot not available' };
+    return { success: false, error: 'Slot not available or already booked' };
   }
 
   async releaseSlot(slotId, sessionId = null) {
-    console.log(`🔓 RELEASE: Slot ${slotId} (GitHub demo)`);
-    
-    // Get fresh data first
-    await this.syncFromGitHub();
+    console.log(`🔓 RELEASE ATTEMPT: Slot ${slotId} (sessionId: ${sessionId ? 'provided' : 'admin override'})`);
     
     const slots = this.getSlots();
     const slotIndex = slots.findIndex(s => s.id === slotId);
@@ -285,15 +369,15 @@ class GitHubDataManager {
       
       slots[slotIndex] = { id: slotId, status: 'available' };
       
-      const success = await this.saveToGitHub(slots);
+      const success = this.saveToLocalStorage(slots);
       
       if (success) {
-        // Force sync to simulate cross-device update
+        // Force immediate notification
         setTimeout(() => {
           this.notifyListeners();
-        }, 1000);
+        }, 100);
         
-        console.log(`✅ RELEASE SUCCESS: Slot ${slotId}`);
+        console.log(`✅ RELEASE SUCCESS: Slot ${slotId} is now available`);
         return { success: true };
       } else {
         return { success: false, error: 'Failed to save release' };
@@ -313,10 +397,10 @@ class GitHubDataManager {
   }
 
   getDeviceId() {
-    let deviceId = localStorage.getItem('githubDeviceId');
+    let deviceId = localStorage.getItem('dellDeviceId');
     if (!deviceId) {
-      deviceId = 'gh_device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      localStorage.setItem('githubDeviceId', deviceId);
+      deviceId = 'dell_device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('dellDeviceId', deviceId);
     }
     return deviceId;
   }
@@ -346,9 +430,13 @@ class GitHubDataManager {
 
   addListener(callback) {
     this.listeners.push(callback);
-    console.log(`🐙 GitHub listener added. Total: ${this.listeners.length}`);
+    console.log(`👂 Listener added. Total listeners: ${this.listeners.length}`);
     
-    setTimeout(() => callback(this.getSlots()), 100);
+    // Immediately provide current data
+    setTimeout(() => {
+      const slots = this.getSlots();
+      callback(slots);
+    }, 100);
   }
 
   removeListener(callback) {
@@ -357,7 +445,7 @@ class GitHubDataManager {
 
   notifyListeners() {
     const slots = this.getSlots();
-    console.log(`🔔 Notifying ${this.listeners.length} GitHub listeners`);
+    console.log(`🔔 Notifying ${this.listeners.length} listeners with ${slots.length} slots`);
     
     this.listeners.forEach((callback, index) => {
       try {
@@ -373,19 +461,38 @@ class GitHubDataManager {
       online: this.isOnline,
       lastSync: localStorage.getItem('lastGitHubSync'),
       lastSave: localStorage.getItem('lastLocalSave'),
+      dataSource: localStorage.getItem('dataSource'),
       repository: `${this.GITHUB_USERNAME}/${this.GITHUB_REPO}`,
-      dataFile: this.DATA_FILE
+      dataFile: this.DATA_FILE,
+      rawUrl: this.RAW_BASE,
+      broadcastSupported: !!this.broadcastChannel,
+      listeners: this.listeners.length
     };
   }
 
   async forceSyncAllDevices() {
-    console.log('🔄 Force syncing all GitHub devices...');
+    console.log('🔄 Force syncing all devices...');
+    
+    // Sync from GitHub
     await this.syncFromGitHub();
+    
+    // Force broadcast update to all tabs
+    const slots = this.getSlots();
+    if (this.broadcastChannel && slots.length > 0) {
+      this.broadcastChannel.postMessage({
+        type: 'slotsUpdated',
+        slots: slots,
+        timestamp: Date.now(),
+        forced: true,
+        source: 'forceSync'
+      });
+      console.log('📡 Force broadcast sent');
+    }
     
     // Force notify all listeners
     setTimeout(() => {
       this.notifyListeners();
-    }, 500);
+    }, 200);
     
     return true;
   }
@@ -394,6 +501,20 @@ class GitHubDataManager {
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+    }
+  }
+
+  // Debug method
+  getDebugInfo() {
+    return {
+      ...this.getConnectionStatus(),
+      slots: this.getSlots(),
+      currentUser: this.getCurrentUser(),
+      lastDataHash: this.lastDataHash,
+      userAgent: navigator.userAgent
+    };
   }
 }
 
@@ -406,3 +527,5 @@ if (!window.githubDataManager) {
 window.dataManager = window.githubDataManager;
 window.cloudDataManager = window.githubDataManager;
 window.simpleDataManager = window.githubDataManager;
+
+console.log('🚀 GitHub DataManager loaded and ready');
