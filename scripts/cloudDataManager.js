@@ -1,136 +1,26 @@
-// scripts/cloudDataManager.js - Firebase-powered cross-device sync
+// scripts/simpleDataManager.js - File-based cross-device sync
 
-class CloudDataManager {
+class SimpleDataManager {
   constructor() {
-    this.FIREBASE_URL = 'https://dell-ev-charging-default-rtdb.firebaseio.com';
-    this.SLOTS_PATH = '/slots';
+    // Internal Dell network shared endpoint
+    this.DATA_URL = '/shared/ev-charging-data.json';
+    this.BACKUP_URL = '/shared/ev-charging-backup.json';
     this.listeners = [];
-    this.isOnline = navigator.onLine;
+    this.pollInterval = null;
+    this.lastDataHash = '';
     
-    // Initialize Firebase connection
-    this.initializeFirebase();
+    console.log('🏢 Simple Internal DataManager initializing...');
     
-    // Setup network monitoring
-    this.setupNetworkMonitoring();
-    
-    // Initialize with default data if needed
-    this.initializeDefaultData();
-    
-    console.log('🌐 CloudDataManager initialized');
+    this.initializeData();
+    this.startRealTimeSync();
   }
 
-  initializeFirebase() {
-    // Setup real-time listeners for Firebase
-    this.setupRealtimeListener();
-  }
-
-  setupNetworkMonitoring() {
-    window.addEventListener('online', () => {
-      this.isOnline = true;
-      console.log('📡 Back online - syncing data');
-      this.syncWithFirebase();
-    });
-    
-    window.addEventListener('offline', () => {
-      this.isOnline = false;
-      console.log('📵 Offline mode - using local cache');
-    });
-  }
-
-  setupRealtimeListener() {
-    // Simulate Firebase real-time updates with periodic fetching
-    setInterval(() => {
-      if (this.isOnline) {
-        this.fetchFromFirebase();
-      }
-    }, 3000);
-  }
-
-  async fetchFromFirebase() {
-    try {
-      // Simulate Firebase fetch - in real implementation, use Firebase SDK
-      const response = await fetch(`${this.FIREBASE_URL}${this.SLOTS_PATH}.json`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data) {
-          this.updateLocalCache(data);
-          this.notifyListeners();
-        }
-      }
-    } catch (error) {
-      console.log('📵 Firebase fetch failed, using local cache');
-      // Fallback to localStorage
-      this.useLocalStorage();
-    }
-  }
-
-  async saveToFirebase(slots) {
-    try {
-      if (!this.isOnline) {
-        this.saveToLocalStorage(slots);
-        return;
-      }
-
-      // Simulate Firebase save - in real implementation, use Firebase SDK
-      const response = await fetch(`${this.FIREBASE_URL}${this.SLOTS_PATH}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(slots)
-      });
-
-      if (response.ok) {
-        console.log('☁️ Data saved to Firebase successfully');
-        this.updateLocalCache(slots);
-      } else {
-        throw new Error('Firebase save failed');
-      }
-    } catch (error) {
-      console.log('⚠️ Firebase unavailable, saving locally:', error.message);
-      this.saveToLocalStorage(slots);
-    }
-  }
-
-  updateLocalCache(slots) {
-    try {
-      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
-      localStorage.setItem('lastSync', new Date().toISOString());
-    } catch (error) {
-      console.error('Failed to update local cache:', error);
-    }
-  }
-
-  saveToLocalStorage(slots) {
-    try {
-      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
-      localStorage.setItem('pendingSync', JSON.stringify(slots));
-      console.log('💾 Data saved locally, will sync when online');
-    } catch (error) {
-      console.error('Failed to save to localStorage:', error);
-    }
-  }
-
-  useLocalStorage() {
-    try {
-      const data = localStorage.getItem('evChargingSlots');
-      if (data) {
-        const slots = JSON.parse(data);
-        this.notifyListeners();
-        return slots;
-      }
-    } catch (error) {
-      console.error('Failed to load from localStorage:', error);
-    }
-    return null;
-  }
-
-  getSlots() {
-    try {
-      const data = localStorage.getItem('evChargingSlots');
-      return data ? JSON.parse(data) : this.getDefaultSlots();
-    } catch (error) {
-      console.error('Error getting slots:', error);
-      return this.getDefaultSlots();
+  async initializeData() {
+    // Try to load existing data
+    const data = await this.loadFromSharedFile();
+    if (!data || data.length === 0) {
+      console.log('📝 Creating initial data file');
+      await this.saveToSharedFile(this.getDefaultSlots());
     }
   }
 
@@ -149,16 +39,136 @@ class CloudDataManager {
     ];
   }
 
-  async initializeDefaultData() {
-    const slots = this.getSlots();
-    if (!slots || slots.length === 0) {
-      console.log('🔄 Initializing default slots data');
-      await this.saveToFirebase(this.getDefaultSlots());
+  startRealTimeSync() {
+    // Poll shared file every 2 seconds
+    this.pollInterval = setInterval(() => {
+      this.syncFromSharedFile();
+    }, 2000);
+    
+    // Initial sync
+    this.syncFromSharedFile();
+  }
+
+  async syncFromSharedFile() {
+    try {
+      const response = await fetch(this.DATA_URL + '?t=' + Date.now(), {
+        method: 'GET',
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const text = await response.text();
+        const dataHash = this.hashCode(text);
+        
+        // Only update if data changed
+        if (dataHash !== this.lastDataHash) {
+          this.lastDataHash = dataHash;
+          
+          const data = JSON.parse(text);
+          
+          // Update local storage
+          localStorage.setItem('evChargingSlots', JSON.stringify(data));
+          localStorage.setItem('lastSync', new Date().toISOString());
+          
+          // Notify listeners
+          this.notifyListeners();
+          
+          console.log('🔄 Synced from shared file:', data.length, 'slots');
+        }
+      }
+    } catch (error) {
+      console.log('⚠️ Shared file sync failed, using local cache:', error.message);
+      // Fallback to localStorage
+      const localData = localStorage.getItem('evChargingSlots');
+      if (localData && this.listeners.length > 0) {
+        this.notifyListeners();
+      }
     }
   }
 
-  generateSessionId() {
-    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  async saveToSharedFile(slots) {
+    try {
+      // Try to save to main file
+      const saveResult = await this.writeToFile(this.DATA_URL, slots);
+      
+      // Also save backup
+      await this.writeToFile(this.BACKUP_URL, {
+        data: slots,
+        timestamp: new Date().toISOString(),
+        backup: true
+      });
+      
+      // Update local storage
+      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
+      localStorage.setItem('lastSync', new Date().toISOString());
+      
+      console.log('💾 Saved to shared file successfully');
+      
+      // Force sync after save
+      setTimeout(() => {
+        this.syncFromSharedFile();
+      }, 500);
+      
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Failed to save to shared file:', error);
+      
+      // Fallback: save locally and mark for retry
+      localStorage.setItem('evChargingSlots', JSON.stringify(slots));
+      localStorage.setItem('pendingSync', JSON.stringify(slots));
+      
+      return false;
+    }
+  }
+
+  async writeToFile(url, data) {
+    // This would typically be handled by a simple PHP script or server endpoint
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+    
+    return response.ok;
+  }
+
+  async loadFromSharedFile() {
+    try {
+      const response = await fetch(this.DATA_URL + '?t=' + Date.now());
+      if (response.ok) {
+        const data = await response.json();
+        return Array.isArray(data) ? data : data.data || [];
+      }
+    } catch (error) {
+      console.log('Could not load from shared file:', error.message);
+    }
+    return null;
+  }
+
+  hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString();
+  }
+
+  getSlots() {
+    try {
+      const data = localStorage.getItem('evChargingSlots');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      return [];
+    }
   }
 
   getCurrentUser() {
@@ -178,10 +188,15 @@ class CloudDataManager {
     }
   }
 
+  generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
   async bookSlot(slotId, userEmail, userPhone) {
-    console.log(`🎯 BOOKING: Slot ${slotId} for ${userEmail}`);
+    console.log(`🎯 BOOKING: Slot ${slotId} for ${userEmail} (shared file)`);
     
-    const slots = this.getSlots();
+    // Get fresh data first
+    const slots = await this.loadFromSharedFile() || this.getSlots();
     const sessionId = this.generateSessionId();
     
     const slotIndex = slots.findIndex(s => s.id === slotId);
@@ -194,39 +209,50 @@ class CloudDataManager {
           phone: userPhone,
           startTime: new Date().toISOString(),
           sessionId: sessionId,
-          deviceId: this.getDeviceId()
+          deviceId: this.getDeviceId(),
+          userAgent: navigator.userAgent
         }
       };
       
       this.setCurrentUser({ email: userEmail, phone: userPhone, sessionId: sessionId });
       
-      await this.saveToFirebase(slots);
+      const success = await this.saveToSharedFile(slots);
       
-      console.log(`✅ BOOKING SUCCESS: Slot ${slotId}`);
-      return { success: true, sessionId: sessionId };
+      if (success) {
+        console.log(`✅ BOOKING SUCCESS: Slot ${slotId}`);
+        return { success: true, sessionId: sessionId };
+      } else {
+        return { success: false, error: 'Failed to save booking' };
+      }
     }
     
     console.log(`❌ BOOKING FAILED: Slot ${slotId} not available`);
-    return { success: false, error: 'Slot not available or already booked' };
+    return { success: false, error: 'Slot not available' };
   }
 
   async releaseSlot(slotId, sessionId = null) {
-    console.log(`🔓 RELEASE: Slot ${slotId}`);
+    console.log(`🔓 RELEASE: Slot ${slotId} (shared file)`);
     
-    const slots = this.getSlots();
+    // Get fresh data first
+    const slots = await this.loadFromSharedFile() || this.getSlots();
     const slotIndex = slots.findIndex(s => s.id === slotId);
     
     if (slotIndex !== -1 && slots[slotIndex].status === 'occupied') {
-      // User release: verify session, Admin release: no verification needed
+      // Verify session for user releases
       if (sessionId && slots[slotIndex].user && slots[slotIndex].user.sessionId !== sessionId) {
         return { success: false, error: 'Not authorized to release this slot' };
       }
       
       slots[slotIndex] = { id: slotId, status: 'available' };
-      await this.saveToFirebase(slots);
       
-      console.log(`✅ RELEASE SUCCESS: Slot ${slotId}`);
-      return { success: true };
+      const success = await this.saveToSharedFile(slots);
+      
+      if (success) {
+        console.log(`✅ RELEASE SUCCESS: Slot ${slotId}`);
+        return { success: true };
+      } else {
+        return { success: false, error: 'Failed to save release' };
+      }
     }
     
     return { success: false, error: 'Slot not occupied' };
@@ -251,7 +277,7 @@ class CloudDataManager {
   }
 
   getStats() {
-    const slots = this.getSlots() || [];
+    const slots = this.getSlots();
     const available = slots.filter(s => s.status === 'available').length;
     const occupied = slots.filter(s => s.status === 'occupied').length;
     
@@ -265,9 +291,8 @@ class CloudDataManager {
 
   addListener(callback) {
     this.listeners.push(callback);
-    console.log(`Listener added. Total: ${this.listeners.length}`);
+    console.log(`📡 Listener added. Total: ${this.listeners.length}`);
     
-    // Immediately call with current data
     setTimeout(() => callback(this.getSlots()), 100);
   }
 
@@ -288,35 +313,33 @@ class CloudDataManager {
     });
   }
 
-  async syncWithFirebase() {
-    if (this.isOnline) {
-      const pendingData = localStorage.getItem('pendingSync');
-      if (pendingData) {
-        try {
-          const slots = JSON.parse(pendingData);
-          await this.saveToFirebase(slots);
-          localStorage.removeItem('pendingSync');
-          console.log('📡 Pending data synced to Firebase');
-        } catch (error) {
-          console.error('Failed to sync pending data:', error);
-        }
-      }
-    }
-  }
-
   getConnectionStatus() {
     return {
-      online: this.isOnline,
+      online: navigator.onLine,
       lastSync: localStorage.getItem('lastSync'),
-      hasPendingSync: !!localStorage.getItem('pendingSync')
+      hasPendingSync: !!localStorage.getItem('pendingSync'),
+      dataUrl: this.DATA_URL
     };
+  }
+
+  async forceSyncAllDevices() {
+    console.log('🔄 Force syncing all devices...');
+    await this.syncFromSharedFile();
+    return true;
+  }
+
+  destroy() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
   }
 }
 
 // Create global instance
-if (!window.cloudDataManager) {
-  window.cloudDataManager = new CloudDataManager();
+if (!window.simpleDataManager) {
+  window.simpleDataManager = new SimpleDataManager();
 }
 
 // Backward compatibility
-window.dataManager = window.cloudDataManager;
+window.dataManager = window.simpleDataManager;
+window.cloudDataManager = window.simpleDataManager;
