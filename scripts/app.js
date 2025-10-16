@@ -1,45 +1,25 @@
-// scripts/app.js - Updated for Dell internal system
+// scripts/app.js - Enhanced user interface for GitHub Pages
 
-// iOS Safari and mobile fixes
+// Mobile and iOS fixes
 if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad') || navigator.userAgent.includes('Android')) {
-  // Prevent mobile browsers from caching
   window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
-      console.log('📱 Mobile page restored from cache - forcing refresh');
+      console.log('📱 Mobile page restored - forcing refresh');
       window.location.reload();
     }
   });
   
-  // Force refresh on focus
   window.addEventListener('focus', function() {
     if (window.userInterface && window.userInterface.forceRefresh) {
-      console.log('📱 Mobile app focused - refreshing data');
-      setTimeout(() => {
-        window.userInterface.forceRefresh();
-      }, 500);
+      console.log('📱 Mobile focused - refreshing');
+      setTimeout(() => window.userInterface.forceRefresh(), 500);
     }
   });
 }
 
-// Rest of your existing app.js code stays exactly the same...
 class UserInterface {
   constructor() {
-    // Change this line to use the simple data manager
-    this.dataManager = window.simpleDataManager;  // Changed from cloudDataManager
-    
-    // ... rest of your existing code stays the same
-  }
-  
-  // All other methods stay exactly the same
-}
-
-// Rest of file remains unchanged...
-
-// scripts/app.js - Cross-device user interface
-
-class UserInterface {
-  constructor() {
-    this.dataManager = window.cloudDataManager;
+    this.dataManager = window.githubDataManager;
     this.selectedSlot = null;
     this.refreshInterval = null;
     
@@ -52,16 +32,16 @@ class UserInterface {
     
     // Listen for real-time updates
     this.dataManager.addListener((slots) => {
-      console.log('📱 User interface received update:', slots?.length || 0, 'slots');
+      console.log('📱 User interface received GitHub update:', slots?.length || 0, 'slots');
       this.render();
     });
     
-    // Auto-refresh every 5 seconds for cross-device sync
+    // Auto-refresh every 10 seconds
     this.refreshInterval = setInterval(() => {
-      this.dataManager.fetchFromFirebase();
-    }, 5000);
+      this.dataManager.syncFromGitHub();
+    }, 10000);
     
-    console.log('📱 UserInterface initialized for cross-device sync');
+    console.log('📱 UserInterface initialized for GitHub Pages');
   }
 
   initializeElements() {
@@ -88,6 +68,14 @@ class UserInterface {
         this.closeBookingModal();
       }
     });
+
+    // Keyboard shortcut for refresh
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+        e.preventDefault();
+        this.forceRefresh();
+      }
+    });
   }
 
   setupConnectionMonitoring() {
@@ -107,7 +95,7 @@ class UserInterface {
     const status = this.dataManager.getConnectionStatus();
     
     if (status.online) {
-      this.connectionStatus.textContent = '🌐 Online';
+      this.connectionStatus.textContent = '🌐 GitHub Online';
       this.connectionStatus.className = 'connection-status online';
     } else {
       this.connectionStatus.textContent = '📵 Offline';
@@ -116,15 +104,22 @@ class UserInterface {
   }
 
   async forceRefresh() {
-    this.showNotification('🔄 Refreshing data across all devices...', 'info');
-    await this.dataManager.fetchFromFirebase();
+    this.connectionStatus.textContent = '🔄 Syncing...';
+    this.connectionStatus.className = 'connection-status syncing';
+    
+    this.showNotification('🔄 Syncing with GitHub across all devices...', 'info');
+    
+    await this.dataManager.forceSyncAllDevices();
     this.render();
     
-    // Update UI to show refresh happened
+    // Update UI feedback
     this.refreshBtn.style.transform = 'rotate(360deg)';
     setTimeout(() => {
       this.refreshBtn.style.transform = 'rotate(0deg)';
+      this.updateConnectionStatus();
     }, 500);
+    
+    console.log('🔄 Force refresh completed');
   }
 
   render() {
@@ -145,9 +140,9 @@ class UserInterface {
     const stats = this.dataManager.getStats();
     
     this.availableCount.textContent = stats.available;
-    this.totalSlotsText.textContent = `${stats.available} of ${stats.total} slots available • Synced across all devices`;
+    this.totalSlotsText.textContent = `${stats.available} of ${stats.total} slots available • GitHub synced`;
     
-    // Color coding based on availability
+    // Color coding
     if (stats.available === 0) {
       this.availableCount.style.color = '#ff6b6b';
     } else if (stats.available <= 3) {
@@ -171,10 +166,10 @@ class UserInterface {
 
   createSlotCard(slot) {
     const card = document.createElement("div");
-    card.className = `slot-card ${slot.status}`;
-    
     const canRelease = this.dataManager.canUserReleaseSlot(slot.id);
     const isMySlot = canRelease;
+    
+    card.className = `slot-card ${slot.status}${isMySlot ? ' my-slot' : ''}`;
     
     let cardContent = `
       <div class="slot-id">${slot.id}</div>
@@ -185,32 +180,34 @@ class UserInterface {
     
     if (slot.status === "occupied" && slot.user) {
       const duration = this.calculateDuration(slot.user.startTime);
+      const deviceInfo = slot.user.userAgent || 'Unknown device';
       
       if (isMySlot) {
         cardContent += `
           <div class="slot-user-info">
             <strong>🔋 Your charging session</strong><br>
-            Duration: ${duration}
+            Duration: <strong>${duration}</strong><br>
+            Device: <em>${deviceInfo}</em>
           </div>
           <button class="end-charging-btn" onclick="userInterface.releaseMySlot('${slot.id}')">
             🔌 End Charging
           </button>
         `;
       } else {
-        // Show limited info about other users
         const maskedEmail = this.maskEmail(slot.user.email);
         cardContent += `
           <div class="slot-user-info">
             <strong>In use by:</strong><br>
             ${maskedEmail}<br>
-            <span class="slot-duration">Duration: ${duration}</span>
+            <span class="slot-duration">Duration: ${duration}</span><br>
+            <small style="color: #999;">Device: ${deviceInfo}</small>
           </div>
         `;
       }
     } else if (slot.status === "available") {
       cardContent += `
-        <div style="color: #666; font-size: 0.9em; margin-top: 0.5rem;">
-          Click to book this slot
+        <div style="color: #666; font-size: 0.95em; margin-top: 1rem; padding: 0.5rem; background: #f8f9fa; border-radius: 8px;">
+          💡 Click to book this slot
         </div>
       `;
       card.style.cursor = 'pointer';
@@ -260,7 +257,7 @@ class UserInterface {
   showMySlot() {
     const currentUser = this.dataManager.getCurrentUser();
     if (!currentUser) {
-      this.showNotification('❌ No active charging session found on this device.', 'error');
+      this.showNotification('❌ No active charging session found.', 'error');
       return;
     }
     
@@ -287,12 +284,12 @@ class UserInterface {
   }
 
   selectSlot(slotId) {
-    // Double-check availability before allowing booking
+    // Double-check availability
     const slots = this.dataManager.getSlots();
     const slot = slots.find(s => s.id === slotId);
     
     if (!slot || slot.status !== 'available') {
-      this.showNotification(`❌ Slot ${slotId} is no longer available. Please refresh and try another slot.`, 'error');
+      this.showNotification(`❌ Slot ${slotId} is no longer available. Refreshing...`, 'error');
       this.forceRefresh();
       return;
     }
@@ -328,8 +325,7 @@ class UserInterface {
       return;
     }
     
-    // Validate email format
-    if (!email.includes('@') || !email.includes('.')) {
+    if (!email.includes('@')) {
       this.showNotification('❌ Please enter a valid email address', 'error');
       return;
     }
@@ -342,11 +338,11 @@ class UserInterface {
       const result = await this.dataManager.bookSlot(this.selectedSlot, email, phone);
       
       if (result.success) {
-        this.showNotification(`✅ Slot ${this.selectedSlot} booked successfully! Visible on all devices.`, 'success');
+        this.showNotification(`✅ Slot ${this.selectedSlot} booked successfully! Syncing to all devices...`, 'success');
         this.closeBookingModal();
         this.render();
         
-        // Force refresh to sync across devices
+        // Force refresh after booking
         setTimeout(() => {
           this.forceRefresh();
         }, 1000);
@@ -371,7 +367,7 @@ class UserInterface {
     
     if (confirm(`🔌 End charging session for slot ${slotId}?
 
-This will make the slot available for other users across all devices.`)) {
+This will make the slot available for other users and sync across all devices.`)) {
       try {
         const result = await this.dataManager.releaseSlot(slotId, currentUser.sessionId);
         
@@ -379,7 +375,7 @@ This will make the slot available for other users across all devices.`)) {
           this.showNotification(`✅ Charging session ended. Slot ${slotId} is now available on all devices!`, 'success');
           this.render();
           
-          // Force sync across devices
+          // Force sync
           setTimeout(() => {
             this.forceRefresh();
           }, 1000);
@@ -438,20 +434,19 @@ This will make the slot available for other users across all devices.`)) {
   }
 }
 
-// Helper function to close modal (for onclick handlers)
+// Helper function
 function closeBookingModal() {
   if (window.userInterface) {
     window.userInterface.closeBookingModal();
   }
 }
 
-// Initialize when DOM is loaded
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('📱 DOM loaded, initializing cross-device UserInterface');
+  console.log('📱 DOM loaded, initializing GitHub UserInterface');
   window.userInterface = new UserInterface();
 });
 
-// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   if (window.userInterface) {
     window.userInterface.destroy();
