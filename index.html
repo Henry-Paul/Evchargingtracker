@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dell EV Charging Station</title>
 <style>
-/* Enhanced User Interface - Cross-device compatible */
+/* Enhanced User Interface - Dell Internal */
 body { 
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
@@ -41,6 +41,7 @@ body {
   border-radius: 20px;
   font-size: 0.8em;
   z-index: 1000;
+  transition: all 0.3s ease;
 }
 
 .connection-status.online {
@@ -50,6 +51,11 @@ body {
 
 .connection-status.offline {
   background: #ff6b6b;
+  color: white;
+}
+
+.connection-status.syncing {
+  background: #ffa726;
   color: white;
 }
 
@@ -68,6 +74,7 @@ body {
   font-weight: bold;
   color: #0076CE;
   margin: 0.5rem 0;
+  transition: color 0.3s ease;
 }
 
 .availability-text {
@@ -75,12 +82,12 @@ body {
   font-size: 1.1em;
 }
 
-.refresh-indicator {
+.sync-indicator {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 8px;
-  height: 8px;
+  top: 15px;
+  right: 15px;
+  width: 10px;
+  height: 10px;
   background: #7AB800;
   border-radius: 50%;
   animation: pulse 2s infinite;
@@ -141,7 +148,7 @@ body {
 
 .slots-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin: 1rem;
 }
@@ -156,6 +163,10 @@ body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   border: 3px solid transparent;
   position: relative;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .slot-card:hover {
@@ -220,7 +231,7 @@ body {
   border-radius: 20px;
   font-size: 0.9em;
   cursor: pointer;
-  margin-top: 0.5rem;
+  margin-top: 0.8rem;
   transition: all 0.3s ease;
 }
 
@@ -338,7 +349,7 @@ body {
 
 .notification {
   position: fixed;
-  top: 20px;
+  top: 60px;
   left: 50%;
   transform: translateX(-50%);
   padding: 1rem 1.5rem;
@@ -359,6 +370,7 @@ body {
 .notification.success { background: #7AB800; }
 .notification.error { background: #ff6b6b; }
 .notification.info { background: #0076CE; }
+.notification.warning { background: #ffa726; }
 
 .hidden { display: none !important; }
 
@@ -383,31 +395,35 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+/* Mobile Responsive */
 @media (max-width: 768px) {
   .header-container h1 { font-size: 1.8em; }
   .availability-number { font-size: 2.5em; }
   .slots-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .booking-form { min-width: 300px; margin: 1rem; }
+  .booking-form { min-width: 300px; margin: 1rem; padding: 1.5rem; }
+  .quick-actions { flex-direction: column; align-items: center; }
+  .action-button { min-width: 200px; justify-content: center; }
 }
 </style>
 </head>
 
 <body>
-<script src="scripts/cloudDataManager.js"></script>
+<!-- Load the new data manager -->
+<script src="scripts/simpleDataManager.js"></script>
 
-<div class="connection-status" id="connectionStatus">🌐 Connecting...</div>
+<div class="connection-status" id="connectionStatus">🔄 Connecting...</div>
 
 <header class="header-container">
   <h1>⚡ Dell EV Charging Station</h1>
-  <p class="subtitle">Real-time charging slot management - All devices synchronized</p>
+  <p class="subtitle">Internal charging slot management • Real-time sync across all Dell devices</p>
 </header>
 
 <section class="availability-banner">
-  <div class="refresh-indicator"></div>
+  <div class="sync-indicator"></div>
   <div class="availability-number" id="availableCount">-</div>
   <div class="availability-text">Available charging slots</div>
   <div style="margin-top: 1rem; color: #666; font-size: 0.9em;" id="totalSlotsText">
-    Syncing across all devices...
+    Syncing with Dell servers...
   </div>
 </section>
 
@@ -428,7 +444,7 @@ body {
   <div class="slots-grid" id="slotsGrid">
     <div class="loading">
       <div class="spinner"></div>
-      <p>Loading charging slots from cloud...</p>
+      <p>Loading slots from Dell servers...</p>
     </div>
   </div>
 </section>
@@ -460,15 +476,15 @@ body {
     </div>
     
     <p style="font-size: 0.9em; color: #666; text-align: center; margin-top: 1rem;">
-      💡 Your booking will be visible on all devices. Scan the QR code again to end charging.
+      💡 Your booking will sync across all Dell devices instantly
     </p>
   </form>
 </div>
 
 <footer class="footer">
-  <p style="color: #666;">Powered by Dell Design System | Real-time Cloud Sync</p>
+  <p style="color: #666;">Powered by Dell Internal Infrastructure</p>
   <p style="font-size: 0.9em; color: #888;">
-    🌐 Multi-device support • 📱 Mobile optimized • ⚡ Instant updates
+    🏢 Internal network • 📱 Multi-device sync • ⚡ Real-time updates
   </p>
 </footer>
 
